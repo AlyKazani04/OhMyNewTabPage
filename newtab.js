@@ -361,7 +361,7 @@ function renderMenu(items, x, y) {
       return true;
     };
     document.onkeydown = function (event) {
-      if (event.keyCode == 27) closeMenu(ul);
+      if (event.code === 'Escape') closeMenu(ul);
       return true;
     };
   }, 20);
@@ -1621,7 +1621,7 @@ loadColumns();
 // keyboard shortcuts
 document.addEventListener("keypress", function (event) {
   if (
-    event.keyCode == 13 &&
+    event.code == 'Enter' &&
     event.target &&
     event.target.onclick &&
     event.target.tagName == "A"

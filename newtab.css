@@ -118,8 +118,19 @@ body {
 .dragstart {
   opacity: 0.5;
 }
-.hide-focus :focus {
+.hide-focus :focus-visible {
   outline: none;
+}
+.vim-cursor {
+  outline: 2px solid currentColor;
+  outline-offset: -1px;
+}
+.hide-focus .vim-cursor {
+  outline: none;
+}
+.vim-selected {
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
 }
 #options,
 #options_button {

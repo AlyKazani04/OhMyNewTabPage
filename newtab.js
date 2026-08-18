@@ -2,7 +2,7 @@
 
 // render a single bookmark node
 function render(node, target) {
-  if (node.description == "separator") return;
+  if (node.description === "separator") return;
 
   var li = document.createElement("li");
   var a = document.createElement("a");
@@ -26,10 +26,10 @@ function render(node, target) {
     };
   } else if (url) {
     var newtab = getConfig("newtab");
-    if (newtab == 1) {
+    if (newtab === 1) {
       // new foreground tab
       a.target = "_blank";
-    } else if (newtab == 2) {
+    } else if (newtab === 2) {
       // new background tab
       a.onclick = function (e) {
         openLink(node, newtab);
@@ -44,7 +44,7 @@ function render(node, target) {
         return false;
       };
       a.onauxclick = function (e) {
-        if (e.button == 1) {
+        if (e.button === 1) {
           openLink(node, 2);
           return false;
         }
@@ -53,6 +53,7 @@ function render(node, target) {
   } else if (!node.children) a.style.pointerEvents = "none";
 
   li.appendChild(a);
+  a._vimNode = node;
 
   // folder
   if (node.children) {
@@ -71,7 +72,7 @@ function render(node, target) {
     // click handlers
     addFolderHandlers(node, a);
     enableDragFolder(node, a);
-  } else if (node.id == "apps") enableDragFolder(node, a);
+  } else if (node.id === "apps") enableDragFolder(node, a);
 
   target.appendChild(li);
   return li;
@@ -101,8 +102,11 @@ function renderAll(nodes, target, toplevel) {
 // render column with given index
 function renderColumn(index, target) {
   var ids = columns[index];
-  if (ids.length == 1 && !getConfig("show_root"))
+  if (!ids) return;
+
+  if (ids.length === 1 && !getConfig("show_root"))
     getChildrenFunction({ id: ids[0] })(function (result) {
+      if (!columns[index]) return;
       renderAll(result, target);
       addColumnHandlers(index, target);
     });
@@ -111,6 +115,8 @@ function renderColumn(index, target) {
     var nodes = [];
     // get all nodes for column
     var callback = function (result) {
+      if (!columns[index]) return;
+
       for (var j = 0; j < result.length; j++) nodes.push(result[j]);
       i++;
       if (i < ids.length) getSubTree(ids[i], callback);
@@ -218,8 +224,10 @@ function addColumnHandlers(index, ul) {
   var items = [];
   var ids = columns[index];
 
+  if (!ids) return;
+
   // single folder items
-  if (ids.length == 1) items = getMenuItems({ id: ids[0] });
+  if (ids.length === 1) items = getMenuItems({ id: ids[0] });
 
   // column layout items
   if (!getConfig("lock") && columns.length > 1) {
@@ -244,7 +252,7 @@ function addColumnHandlers(index, ul) {
         removeColumn(index);
       },
     });
-    if (ids.length == 1) {
+    if (ids.length === 1) {
       if (index > 0)
         items.push({
           label: "Move folder left",
@@ -264,7 +272,7 @@ function addColumnHandlers(index, ul) {
 
   if (items.length > 0)
     ul.oncontextmenu = function (event) {
-      if (event.target.tagName == "A" || event.target.parentNode.tagName == "A")
+      if (event.target.tagName === "A" || event.target.parentNode.tagName === "A")
         return true;
       renderMenu(items, event.pageX, event.pageY);
       return false;
@@ -280,14 +288,14 @@ function getMenuItems(node) {
       openLinks(node);
     },
   });
-  if (node.id == "closed")
+  if (node.id === "closed")
     items.push({
       label: "Clear browsing data",
       action: function () {
         openLink({ url: "chrome://settings/clearBrowserData" }, 1);
       },
     });
-  if (node.id == "devices")
+  if (node.id === "devices")
     items.push({
       label: "History",
       action: function () {
@@ -305,9 +313,10 @@ function getMenuItems(node) {
 }
 
 // wraps click handler for menu items
-function onMenuClick(item) {
+function onMenuClick(item, ul) {
   return function () {
     item.action();
+    closeMenu(ul);
     return false;
   };
 }
@@ -318,11 +327,12 @@ function renderMenu(items, x, y) {
   ul.className = "menu";
   for (var i = 0; i < items.length; i++) {
     var li = document.createElement("li");
+    li.setAttribute('tabindex', '0');
     if (items[i]) {
       var a = document.createElement("a");
       a.innerText = items[i].label;
       a.tabIndex = 0;
-      a.onclick = onMenuClick(items[i]);
+      a.onclick = onMenuClick(items[i], ul);
 
       li.appendChild(a);
     } else if (i > 0 && i < items.length - 1)
@@ -330,6 +340,7 @@ function renderMenu(items, x, y) {
     else continue;
 
     ul.appendChild(li);
+    li.focus();
   }
   document.body.appendChild(ul);
   ul.style.left =
@@ -370,7 +381,9 @@ function renderMenu(items, x, y) {
 
 // removes the given popup menu
 function closeMenu(ul) {
-  document.body.removeChild(ul);
+  if (ul && ul.parentNode) {
+    ul.parentNode.removeChild(ul);
+  }
   document.onclick = null;
   document.onmousedown = null;
   document.oncontextmenu = null;
@@ -437,7 +450,7 @@ function enableDragDrop() {
       clearDropTarget();
       dropTarget = target;
       var bordercss = "solid 2px " + getConfig("font_color");
-      if (target.tagName == "LI" || target.tagName == "UL") {
+      if (target.tagName === "LI" || target.tagName === "UL") {
         if (isAbove(event.pageY, target)) {
           target.style.borderBottom = bordercss;
           target.style.margin = "0 0 -2px 0";
@@ -445,7 +458,7 @@ function enableDragDrop() {
           target.style.borderTop = bordercss;
           target.style.margin = "-2px 0 0 0";
         }
-      } else if (target.className == "column") {
+      } else if (target.className === "column") {
         if (event.pageX - target.offsetLeft > target.clientWidth / 2) {
           target.style.borderRight = bordercss;
           target.style.margin = "0";
@@ -472,7 +485,7 @@ function enableDragDrop() {
     var x = getDropX(target, event);
     var y = getDropY(target, event);
 
-    if (dragIds.length == 1 && y != null) addRow(dragIds[0], x, y);
+    if (dragIds.length === 1 && y != null) addRow(dragIds[0], x, y);
     else {
       if (event.pageX - target.offsetLeft > target.clientWidth / 2) x++;
       addColumn(dragIds, x);
@@ -488,8 +501,8 @@ function getDropTarget(event) {
   var target = event.target;
   if (
     target &&
-    (target.tagName == "A" || target.parentNode.tagName == "A") &&
-    dragIds.length == 1
+    (target.tagName === "A" || target.parentNode.tagName === "A") &&
+    dragIds.length === 1
   ) {
     // get parent folder until toplevel
     while (
@@ -503,8 +516,8 @@ function getDropTarget(event) {
     // if single-folder column, get the UL
     if (
       target &&
-      target.tagName == "LI" &&
-      columns[getDropX(target, event)].length == 1
+      target.tagName === "LI" &&
+      columns[getDropX(target, event)].length === 1
     )
       target = target.parentNode;
     // target should be LI or UL by here...
@@ -528,11 +541,11 @@ function getDropX(target, event) {
 // gets y coordinate of drop target
 function getDropY(target, event) {
   var y = null;
-  if (target.tagName == "LI") {
+  if (target.tagName === "LI") {
     y = 0;
     if (isAbove(event.pageY, target)) y++;
     for (; target.previousSibling; y++) target = target.previousSibling;
-  } else if (target.tagName == "UL") {
+  } else if (target.tagName === "UL") {
     y = 0;
     if (isAbove(event.pageY, target)) y++;
   }
@@ -615,11 +628,15 @@ function getChildrenFunction(node) {
       else
         return function (callback) {
           chrome.bookmarks.getSubTree(node.id, function (result) {
+            if (chrome.runtime.lastError) {
+              var err = chrome.runtime.lastError;
+            }
             if (result) callback(result[0].children);
             else {
               // remove missing bookmark locations
               if (coords[node.id])
                 removeRow(coords[node.id].x, coords[node.id].y);
+              callback([]);
             }
           });
         };
@@ -646,6 +663,9 @@ function getSubTree(id, callback) {
       break;
     default:
       chrome.bookmarks.getSubTree(id, function (result) {
+        if (chrome.runtime.lastError) {
+          var err = chrome.runtime.lastError;
+        }
         if (result) callback(result);
         else {
           // remove missing bookmark locations
@@ -717,7 +737,7 @@ function toggle(node, a) {
       // auto-close child folders
       if (getConfig("auto_close")) {
         var children = (
-          a.nextSibling.tagName == "DIV"
+          a.nextSibling.tagName === "DIV"
             ? a.nextSibling.firstChild
             : a.nextSibling
         ).children;
@@ -807,7 +827,7 @@ function openLink(node, newtab) {
       if (newtab)
         chrome.tabs.create({
           url: url,
-          active: newtab == 1,
+          active: newtab === 1,
           openerTabId: tab.id,
         });
       else chrome.tabs.update(tab.id, { url: url });
@@ -926,7 +946,7 @@ function addColumn(ids, index) {
     }
   }
   // insert new id
-  if (index == null) index = columns.length;
+  if (index === null) index = columns.length;
   columns.splice(Math.min(index, columns.length), 0, column);
 
   // save
@@ -941,14 +961,14 @@ function removeColumn(index) {
 
 // creates and saves a new row
 function addRow(id, xpos, ypos) {
-  if (ypos == null) ypos = columns[xpos].length;
+  if (ypos === null) ypos = columns[xpos].length;
 
   // remove previous locations
   for (var x = 0; x < columns.length; x++) {
     var i = columns[x].indexOf(id);
     if (i > -1) {
       columns[x].splice(i, 1);
-      if (x == xpos && ypos > i) ypos--;
+      if (x === xpos && ypos > i) ypos--;
     }
     if (columns[x].length === 0) {
       columns.splice(x, 1);
@@ -978,7 +998,7 @@ function getClosed(callback) {
       var nodes = [];
       for (var i = 0; i < sessions.length && i < maxResults; i++) {
         (function (session) {
-          if (session.window && session.window.tabs.length == 1)
+          if (session.window && session.window.tabs.length === 1)
             session.tab = session.window.tabs[0];
 
           nodes.push({
@@ -1204,13 +1224,13 @@ function setConfig(key, value) {
   }
   // special case settings
   if (
-    key == "lock" ||
-    key == "newtab" ||
-    key == "show_root" ||
-    key.substring(0, 6) == "number"
+    key === "lock" ||
+    key === "newtab" ||
+    key === "show_root" ||
+    key.substring(0, 6) === "number"
   )
     loadColumns();
-  else if (key == "theme") {
+  else if (key === "theme") {
     theme = themes[value];
     for (var i in config) {
       if (i != key) {
@@ -1218,7 +1238,7 @@ function setConfig(key, value) {
         showConfig(i);
       }
     }
-  } else if (key.substring(0, 4) == "show") {
+  } else if (key.substring(0, 4) === "show") {
     var id = key.substring(5);
     if (!value) {
       if (coords[id]) removeRow(coords[id].x, coords[id].y);
@@ -1335,14 +1355,14 @@ function scale(value, mid, max, min) {
 }
 
 // gets rgb representation of hex color
-function hexToRgb(hex) {
-  hex = /[a-f\d]{6}/i.exec(hex);
-  var bigint = parseInt(hex, 16);
-  var r = (bigint >> 16) & 255;
-  var g = (bigint >> 8) & 255;
-  var b = bigint & 255;
-  return r + "," + g + "," + b;
-}
+// function hexToRgb(hex) {
+//   hex = /[a-f\d]{6}/i.exec(hex);
+//   var bigint = parseInt(hex, 16);
+//   var r = (bigint >> 16) & 255;
+//   var g = (bigint >> 8) & 255;
+//   var b = bigint & 255;
+//   return r + "," + g + "," + b;
+// }
 
 // apply config value change
 function onChange(key, value) {
@@ -1368,9 +1388,9 @@ function onChange(key, value) {
     delete styles[key];
   }
   // refresh dependent values
-  if (key == "width") onChange("h_pos");
-  else if (key == "shadow_blur") onChange("shadow_color");
-  else if (key == "auto_scale") {
+  if (key === "width") onChange("h_pos");
+  else if (key === "shadow_blur") onChange("shadow_color");
+  else if (key === "auto_scale") {
     onChange("width");
     onChange("v_margin");
   }
@@ -1382,7 +1402,7 @@ function onChange(key, value) {
   var input = document.getElementById("options_" + key);
   if (input) {
     var isDefault =
-      value == (theme.hasOwnProperty(key) ? theme[key] : config[key]);
+      value === (theme.hasOwnProperty(key) ? theme[key] : config[key]);
     input.reset.style.visibility = isDefault ? "hidden" : null;
     if (input.swatch) input.swatch.value = value;
   }
@@ -1414,7 +1434,7 @@ function initConfig(key) {
   var input = document.getElementById("options_" + key);
   if (!input) return;
 
-  if (input.type == "color") {
+  if (input.type === "color") {
     input.type = "text";
     input.className = "color";
     var swatch = document.createElement("input");
@@ -1428,9 +1448,9 @@ function initConfig(key) {
     input.parentNode.appendChild(swatch);
   }
   input.onchange = function (event) {
-    if (input.type == "file") {
+    if (input.type === "file") {
       // load file
-      if (event.target.files.length == 1) {
+      if (event.target.files.length === 1) {
         var file = event.target.files[0];
         if (file.size > 2097152) {
           input.value = null;
@@ -1446,7 +1466,7 @@ function initConfig(key) {
     } else
       setConfig(
         key,
-        input.type == "checkbox" ? Number(input.checked) : input.value,
+        input.type === "checkbox" ? Number(input.checked) : input.value,
       );
   };
 
@@ -1509,8 +1529,8 @@ function initSettings() {
         var imports = document.getElementById("options_import");
         var replacer = function (key, value) {
           if (
-            key == "options.background_image_file" ||
-            key == "weather.cache"
+            key === "options.background_image_file" ||
+            key === "weather.cache"
           ) {
             return undefined;
           }
@@ -1581,7 +1601,7 @@ function initSettings() {
       for (var i in themes) {
         var option = document.createElement("option");
         option.innerText = i;
-        if (i == getConfig("theme")) option.selected = "selected";
+        if (i === getConfig("theme")) option.selected = "selected";
         select.appendChild(option);
       }
     }
@@ -1597,7 +1617,7 @@ function initSettings() {
           var font = fonts[i].fontId;
           var option = document.createElement("option");
           option.innerText = font;
-          if (font == getConfig("font")) option.selected = "selected";
+          if (font === getConfig("font")) option.selected = "selected";
           select.appendChild(option);
         }
       });
@@ -1621,10 +1641,10 @@ loadColumns();
 // keyboard shortcuts
 document.addEventListener("keypress", function (event) {
   if (
-    event.code == 'Enter' &&
+    event.code === 'Enter' &&
     event.target &&
     event.target.onclick &&
-    event.target.tagName == "A"
+    event.target.tagName === "A"
   ) {
     event.target.dispatchEvent(new MouseEvent("click"));
     event.preventDefault();

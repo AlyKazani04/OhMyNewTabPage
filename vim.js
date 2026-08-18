@@ -140,7 +140,10 @@ function vimOpenFolder() {
 async function copyBookmarkSubtree(sourceId, destParentId) {
   var results = await new Promise(function (resolve) {
     chrome.bookmarks.getSubTree(sourceId, (res) => {
-      if (chrome.runtime.lastError) resolve(null);
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError);
+        resolve(null);
+      }
       else resolve(res);
     });
   });
@@ -203,96 +206,54 @@ function vimCut() {
 
 async function vimPaste(asColumn) {
   if (clipboard.ids.length === 0) return;
-
   var destX = vimCursor.x;
-  var destY = getCursorRow(destX);
-
-  if (asColumn) {
-    addColumn(clipboard.ids, destX + 1);
+  if (clipboard.mode === "cut") {
+    for (var i = 0; i < clipboard.ids.length; i++) {
+      addRow(clipboard.ids[i], destX, destY + i);
+    }
     return;
   }
-
-  var targetY = destY + 1;
-  if (clipboard.mode === 'cut') {
-    for (var i = 0; i < clipboard.ids.length; i++) {
-      addRow(clipboard.ids[i], destX, targetY + i);
-    }
-  } else {
-    for (var i = 0; i < clipboard.ids.length; i++) {
-      var id = clipboard.ids[i];
-      var added = false;
-      if (/^\d+$/.test(id)) {
-        try {
-          var results = await new Promise(function (resolve) {
-            chrome.bookmarks.getSubTree(id, function (res) {
-              if (chrome.runtime.lastError) resolve(null);
-              else resolve(res);
-            });
+  for (var i = 0; i < clipboard.ids.length; i++) {
+    var id = clipboard.ids[i];
+    var added = false;
+    if (/^\d+$/.test(id)) {
+      try {
+        var results = await new Promise(function (resolve) {
+          chrome.bookmarks.getSubTree(id, function (res) {
+            if (chrome.runtime.lastError) {
+              console.warn(chrome.runtime.lastError);
+              resolve(null);
+            } else resolve(res);
           });
-          if (results && results[0]) {
-            var parentId = results[0].parentId;
-            if (!parentId && columns[0] && columns[0].length > 0) {
-              parentId = columns[0][0];
-            }
-            if (parentId) {
-              var newNode = await copyBookmarkSubtree(id, parentId);
-              if (newNode && newNode.id) {
-                addRow(newNode.id, destX, targetY + i);
-                added = true;
-              }
+        });
+        if (results && results[0]) {
+          var parentId = results[0].parentId;
+          if (!parentId && columns[0] && columns[0].length > 0) {
+            parentId = columns[0][0];
+          }
+          if (parentId) {
+            var newNode = await copyBookmarkSubtree(id, parentId);
+            if (newNode && newNode.id) {
+              addRow(newNode.id, destX, targetY + i);
+              added = true;
             }
           }
-        } catch (e) { }
-      }
-      if (!added) {
-        addRow(id, destX, targetY + i);
-      }
+        }
+      } catch (e) { }
+    }
+    if (!added) {
+      addRow(id, destX, targetY + i);
     }
   }
 }
 
+function vimPaste(asColumn) {
+  if (asColumn) return addColumn(clipboard.ids, destX + 1);
+  return vimPasterAt(getCursorRow(vimCursor.x));
+}
+
 async function vimPasteAbove() {
-  if (clipboard.ids.length === 0) return;
-
-  var destX = vimCursor.x;
-  var targetY = getCursorRow(destX);
-
-  if (clipboard.mode === "cut") {
-    for (var i = 0; i < clipboard.ids.length; i++) {
-      addRow(clipboard.ids[i], destX, targetY + i);
-    }
-  } else {
-    for (var i = 0; i < clipboard.ids.length; i++) {
-      var id = clipboard.ids[i];
-      var added = false;
-      if (/^\d+$/.test(id)) {
-        try {
-          var results = await new Promise(function (resolve) {
-            chrome.bookmarks.getSubTree(id, function (res) {
-              if (chrome.runtime.lastError) resolve(null);
-              else resolve(res);
-            });
-          });
-          if (results && results[0]) {
-            var parentId = results[0].parentId;
-            if (!parentId && columns[0] && columns[0].length > 0) {
-              parentId = columns[0][0];
-            }
-            if (parentId) {
-              var newNode = await copyBookmarkSubtree(id, parentId);
-              if (newNode && newNode.id) {
-                addRow(newNode.id, destX, targetY + i);
-                added = true;
-              }
-            }
-          }
-        } catch (e) { }
-      }
-      if (!added) {
-        addRow(id, destX, targetY + i);
-      }
-    }
-  }
+  return vimPasteAt(getCursorRow(vimCursor.x));
 }
 
 // Theme picker
@@ -414,16 +375,13 @@ document.addEventListener("keydown", function (event) {
       break;
     case "C":
       removeColumn(vimCursor.x);
+      break;
     case "p":
       vimPaste(false);
       event.preventDefault();
       break;
     case "P":
       vimPasteAbove();
-      event.preventDefault();
-      break;
-    case "\u0010": // Ctrl+P
-      vimPaste(true);
       event.preventDefault();
       break;
     case "T":

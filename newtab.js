@@ -302,7 +302,7 @@ function getMenuItems(node) {
         openLink({ url: "chrome://history" }, 1);
       },
     });
-  if (Number(node.id))
+  if (node.id && /^\d+$/.test(node.id))
     items.push({
       label: "Edit bookmarks",
       action: function () {
@@ -914,18 +914,20 @@ function loadColumns() {
 // saves current column configuration to storage
 function saveColumns() {
   // clear previous config
-  for (var x = 0; ; x++) {
-    for (var y = 0; ; y++) {
-      var id = localStorage.getItem("column." + x + "." + y);
+  for (let x = 0; ; x++) {
+    let hadAny = false;
+    for (let y = 0; ; y++) {
+      let id = localStorage.getItem("column." + x + "." + y);
+      if (!id) break;
       if (id) localStorage.removeItem("column." + x + "." + y);
-      else break;
+      hadAny = true;
     }
-    if (y === 0) break;
+    if (!hadAny) break;
   }
   verifyColumns();
   // save new config
-  for (var x = 0; x < columns.length; x++) {
-    for (var y = 0; y < columns[x].length; y++) {
+  for (let x = 0; x < columns.length; x++) {
+    for (let y = 0; y < columns[x].length; y++) {
       localStorage.setItem("column." + x + "." + y, columns[x][y]);
     }
   }
@@ -1230,7 +1232,7 @@ function setConfig(key, value) {
     key.substring(0, 6) === "number"
   )
     loadColumns();
-  else if (key === "theme") {
+  else if (key == "theme") {
     theme = themes[value];
     for (var i in config) {
       if (i != key) {

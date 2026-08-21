@@ -204,7 +204,22 @@ function vimCut() {
   updateCursorVisuals();
 }
 
-async function vimPaste(asColumn) {
+function vimDelete() {
+  if (!vimEl) return;
+
+  var ids = vimGetTargetIds();
+  if (ids.length === 0) return;
+  clipboard = { ids: ids, mode: "delete" };
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    if (coords[id]) removeRow(coords[id].x, coords[id].y);
+  }
+  vimSelected.clear();
+  vimCursor.y = clamp(vimCursor.y - 1, 0, getVisibleLinks(vimCursor.x).length - 1);
+  updateCursorVisuals();
+}
+
+async function vimPasteAt(destY) {
   if (clipboard.ids.length === 0) return;
   var destX = vimCursor.x;
   if (clipboard.mode === "cut") {
@@ -312,18 +327,22 @@ document.addEventListener("keydown", function (event) {
   }
 
   switch (key) {
+    case "ArrowLeft":
     case "h":
       moveCursor(-1, 0);
       event.preventDefault();
       break;
+    case "ArrowRight":
     case "l":
       moveCursor(1, 0);
       event.preventDefault();
       break;
+    case 'ArrowDown':
     case "j":
       moveCursor(0, 1);
       event.preventDefault();
       break;
+    case 'ArrowUp':
     case "k":
       moveCursor(0, -1);
       event.preventDefault();
@@ -337,61 +356,61 @@ document.addEventListener("keydown", function (event) {
       vimOpenFolder();
       event.preventDefault();
       break;
-    case "g":
-      vimPending = "g";
-      vimPendingTimer = setTimeout(function () {
-        vimPending = null;
-      }, 500);
-      event.preventDefault();
-      break;
-    case "G":
-      vimCursor.x = columns.length - 1;
-      vimCursor.y = Math.max(0, getVisibleLinks(vimCursor.x).length - 1);
-      resolveCursor();
-      event.preventDefault();
-      break;
-    case "v":
-      if (vimEl && vimEl._vimNode) {
-        var id = vimEl._vimNode.id;
-        if (vimSelected.has(id)) vimSelected.delete(id);
-        else vimSelected.add(id);
-        updateCursorVisuals();
-      }
-      event.preventDefault();
-      break;
-    case "V":
-      vimSelected.clear();
-      updateCursorVisuals();
-      event.preventDefault();
-      break;
-    case "y":
-      vimYank();
-      event.preventDefault();
-      break;
-    case "d":
-    case "x":
-      vimCut();
-      event.preventDefault();
-      break;
-    case "C":
-      removeColumn(vimCursor.x);
-      break;
-    case "p":
-      vimPaste(false);
-      event.preventDefault();
-      break;
-    case "P":
-      vimPasteAbove();
-      event.preventDefault();
-      break;
-    case "T":
-      vimShowThemePicker();
-      event.preventDefault();
-      break;
-    case "Escape":
-      vimSelected.clear();
-      updateCursorVisuals();
-      break;
+    // case "g":
+    //   vimPending = "g";
+    //   vimPendingTimer = setTimeout(function () {
+    //     vimPending = null;
+    //   }, 500);
+    //   event.preventDefault();
+    //   break;
+    // case "G":
+    //   vimCursor.x = columns.length - 1;
+    //   vimCursor.y = Math.max(0, getVisibleLinks(vimCursor.x).length - 1);
+    //   resolveCursor();
+    //   event.preventDefault();
+    //   break;
+    // case "v":
+    //   if (vimEl && vimEl._vimNode) {
+    //     var id = vimEl._vimNode.id;
+    //     if (vimSelected.has(id)) vimSelected.delete(id);
+    //     else vimSelected.add(id);
+    //     updateCursorVisuals();
+    //   }
+    //   event.preventDefault();
+    //   break;
+    // case "V":
+    //   vimSelected.clear();
+    //   updateCursorVisuals();
+    //   event.preventDefault();
+    //   break;
+    // case "y":
+    //   vimYank();
+    //   event.preventDefault();
+    //   break;
+    // case "d":
+    // case "x":
+    //   vimCut();
+    //   event.preventDefault();
+    //   break;
+    // case "C":
+    //   removeColumn(vimCursor.x);
+    //   break;
+    // case "p":
+    //   vimPaste(false);
+    //   event.preventDefault();
+    //   break;
+    // case "P":
+    //   vimPasteAbove();
+    //   event.preventDefault();
+    //   break;
+    // case "T":
+    //   vimShowThemePicker();
+    //   event.preventDefault();
+    //   break;
+    // case "Escape":
+    //   vimSelected.clear();
+    //   updateCursorVisuals();
+    //   break;
   }
 });
 

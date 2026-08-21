@@ -9,7 +9,7 @@ function render(node, target) {
 
   var url = node.url;
   if (url) a.href = url;
-  else a.tabIndex = 0;
+  else a.tabIndex = -1;
 
   var text = node.title || node.name || "";
   if (!text && node.title === null) text = node.url || "";
@@ -327,11 +327,11 @@ function renderMenu(items, x, y) {
   ul.className = "menu";
   for (var i = 0; i < items.length; i++) {
     var li = document.createElement("li");
-    li.setAttribute('tabindex', '0');
+    li.setAttribute('tabindex', '-1');
     if (items[i]) {
       var a = document.createElement("a");
       a.innerText = items[i].label;
-      a.tabIndex = 0;
+      a.tabIndex = -1;
       a.onclick = onMenuClick(items[i], ul);
 
       li.appendChild(a);
@@ -690,6 +690,7 @@ function setClass(target, node, isopen) {
     case "devices":
     case "empty":
       target.classList.add(node.id);
+      target.setAttribute('tabindex', '-1');
   }
 }
 
@@ -1475,7 +1476,7 @@ function initConfig(key) {
   var reset = document.createElement("a");
   reset.className = "revert";
   reset.title = "Reset to default";
-  reset.tabIndex = 0;
+  reset.tabIndex = -1;
   reset.onclick = function () {
     setConfig(key, null);
     showConfig(key);

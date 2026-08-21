@@ -28,19 +28,18 @@ If you find a bug, please open an issue on GitHub and include:
 
 - A clear, descriptive title.
 - Steps to reproduce the bug.
-- Expected vs. actual behavior.
 - Your browser version and operating system.
 
 ### 2. Suggesting New Features
 
 Have an idea to make `OhMyNewTabPage` better?
 
-- Open an issue tagged with `enhancement`.
+- Open an discussion thread in `💡 Ideas` category of `OhMyNewTabPage Discussions`.
 - Clearly explain the feature, why it would be useful, and how you envision it working.
 
 ### 3. Pull Requests & Code Contributions
 
-We love pull requests! To ensure your contribution gets merged smoothly:
+I love pull requests! To ensure your contribution gets merged smoothly:
 
 #### 1. **Fork the Repository** and create your feature branch from `main`
 
@@ -50,7 +49,7 @@ git checkout -b feature/amazing-feature
 
 #### 2. **Follow Git Hygiene:**
 
-- Write clear, self-explanatory commit messages.
+- Write clear, self-explanatory commit messages or use the repo's commit message conventions.
 - Keep commits focused and atomic.
 
 #### 3. **Test Your Changes:**

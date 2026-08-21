@@ -20,16 +20,24 @@ A lightning-fast, keyboard-centric new tab page for power users. This project is
 
 ## Usage & Navigation
 
-Designed with speed in mind, OhMyNewTabPage allows you to stay entirely on your keyboard.
+Designed with speed in mind, OhMyNewTabPage allows you to stay entirely* on your keyboard.
 
-**(Documentation on specific keybindings and configuration options coming soon.)**
+| **Key**                  | **Action**                                 |
+| :----------------------- | :----------------------------------------- |
+| `h` or `left arrow (←)`  | Select the node on the column to the left  |
+| `l` or `right arrow (→)` | Select the node on the column to the right |
+| `j` or `down arrow (↓)`  | Select the node on the next row            |
+| `k` or `up arrow (↑)`    | Select the node on the previous row        |
+| `Enter` or `o`           | Open folder or link                        |
+
+*The options menu navigation is a work in progress.
 
 ## Contributing
 
 Contributions are very welcome! Whether it's reporting a bug, suggesting a feature, or submitting a pull request, your help is appreciated.
 
-Please read our `CONTRIBUTING.md` guide for details on our code of conduct and the process for submitting pull requests.
+Please read our [CONTRIBUTING](/CONTRIBUTING.md) guide for details.
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](/LICENSE) for more information.

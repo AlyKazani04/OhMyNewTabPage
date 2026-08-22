@@ -305,10 +305,7 @@ document.addEventListener("keydown", function (event) {
 
   var key = event.key;
 
-  // Ctrl+P shortcut
-  if (event.ctrlKey && (key === "p" || key === "P")) {
-    vimPaste(true);
-    event.preventDefault();
+  if (event.ctrlKey) {
     return;
   }
 
@@ -356,6 +353,8 @@ document.addEventListener("keydown", function (event) {
       vimOpenFolder();
       event.preventDefault();
       break;
+    // TODO: Additional Features, review and implement
+
     // case "g":
     //   vimPending = "g";
     //   vimPendingTimer = setTimeout(function () {

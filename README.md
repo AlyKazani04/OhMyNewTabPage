@@ -22,13 +22,17 @@ A lightning-fast, keyboard-centric new tab page for power users. This project is
 
 Designed with speed in mind, OhMyNewTabPage allows you to stay entirely* on your keyboard.
 
-| **Key**                  | **Action**                                 |
-| :----------------------- | :----------------------------------------- |
+|         **Key**          | **Action**                                 |
+| :----------------------: | :----------------------------------------- |
 | `h` or `left arrow (←)`  | Select the node on the column to the left  |
 | `l` or `right arrow (→)` | Select the node on the column to the right |
 | `j` or `down arrow (↓)`  | Select the node on the next row            |
-| `k` or `up arrow (↑)`    | Select the node on the previous row        |
-| `Enter` or `o`           | Open folder or link                        |
+|  `k` or `up arrow (↑)`   | Select the node on the previous row        |
+|     `Enter` or `o/O`     | Open folder or link                        |
+|           `n`            | Create a bookmark on the current level     |
+|           `N`            | Create a folder on the current level       |
+|           `e`            | Edit bookmark or folder                    |
+|           `d`            | Delete bookmark or folder                  |
 
 *The options menu navigation is a work in progress.
 

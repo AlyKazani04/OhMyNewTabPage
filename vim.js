@@ -287,6 +287,7 @@ function createBookmark() {
 }
 
 function createFolder() {
+  var context = getInsertionContext();
   showModal({
     title: "New folder",
     fields: [{ label: "Name", placeholder: "New folder" }],
@@ -305,6 +306,28 @@ function createFolder() {
 }
 
 function updateBookmark(node) {
+
+  showModal({
+    title: "Update Bookmark",
+    fields: [
+      { label: "Name", placeholder: "Bookmark Name", value: node.title },
+      { label: "URL", placeholder: "example.com", value: node.url }
+    ],
+    onSubmit: function (values) {
+      var title = values[0].trim();
+      var url = values[1].trim();
+      if (!url) return false;
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
+      if (!title) return false;
+      chrome.bookmarks.update(
+        node.id, { title: title || url, url },
+        function () {
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
 }
 
 function updateFolder(node) {
@@ -325,7 +348,7 @@ function updateFolder(node) {
   });
 }
 
-function update() {
+function updateNode() {
   if (!vimEl) return;
 
   if (vimEl._vimNode) {
@@ -336,6 +359,37 @@ function update() {
     }
     else {
       updateBookmark(node);
+    }
+  }
+}
+
+function deleteBookmark(node) {
+  chrome.bookmarks.remove(node.id,
+    function () {
+      renderColumns();
+    }
+  );
+}
+
+function deleteFolder(node) {
+  chrome.bookmarks.removeTree(node.id,
+    function () {
+      renderColumns();
+    },
+  );
+}
+
+function deleteNode() {
+  if (!vimEl) return;
+
+  if (vimEl._vimNode) {
+    let node = vimEl._vimNode;
+    var isFolder = vimEl.classList.contains("folder");
+    if (isFolder) {
+      deleteFolder(node);
+    }
+    else {
+      deleteBookmark(node);
     }
   }
 }
@@ -554,7 +608,11 @@ document.addEventListener("keydown", function (event) {
       break;
     case 'e':
       event.preventDefault();
-      update();
+      updateNode();
+      break;
+    case "d":
+      event.preventDefault();
+      deleteNode();
       break;
 
     // TODO: Additional Features, review and implement
@@ -577,7 +635,6 @@ document.addEventListener("keydown", function (event) {
     //   vimYank();
     //   event.preventDefault();
     //   break;
-    // case "d":
     // case "x":
     //   vimCut();
     //   event.preventDefault();

@@ -160,6 +160,7 @@ function showModal(options) {
       var input = document.createElement("input");
       input.type = "text";
       input.placeholder = field.placeholder || "";
+      input.value = field.value || "";
       label.appendChild(p);
       label.appendChild(input);
       form.appendChild(label);
@@ -175,7 +176,7 @@ function showModal(options) {
   cancel.onclick = close;
   var submit = document.createElement("button");
   submit.type = "submit";
-  submit.innerText = "Create";
+  submit.innerText = "Submit";
   buttons.appendChild(cancel);
   buttons.appendChild(submit);
   form.appendChild(buttons);
@@ -286,7 +287,6 @@ function createBookmark() {
 }
 
 function createFolder() {
-  var context = getInsertionContext();
   showModal({
     title: "New folder",
     fields: [{ label: "Name", placeholder: "New folder" }],
@@ -302,6 +302,42 @@ function createFolder() {
       return true;
     },
   });
+}
+
+function updateBookmark(node) {
+}
+
+function updateFolder(node) {
+  showModal({
+    title: "Update folder",
+    fields: [{ label: "Name", placeholder: "Folder Name", value: node.title }],
+    onSubmit: function (values) {
+      var title = values[0].trim();
+      if (!title) return false;
+      chrome.bookmarks.update(
+        node.id, { title: title },
+        function () {
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
+}
+
+function update() {
+  if (!vimEl) return;
+
+  if (vimEl._vimNode) {
+    let node = vimEl._vimNode;
+    var isFolder = vimEl.classList.contains("folder");
+    if (isFolder) {
+      updateFolder(node);
+    }
+    else {
+      updateBookmark(node);
+    }
+  }
 }
 
 // Bookmark duplication
@@ -515,6 +551,10 @@ document.addEventListener("keydown", function (event) {
     case 'N':
       createFolder();
       event.preventDefault();
+      break;
+    case 'e':
+      event.preventDefault();
+      update();
       break;
 
     // TODO: Additional Features, review and implement

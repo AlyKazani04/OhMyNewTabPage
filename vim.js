@@ -118,7 +118,7 @@ function moveCursor(dx, dy) {
   updateCursorVisuals();
 }
 
-// Activation
+// CRUD basics
 function vimActivate() {
   if (!vimEl) return;
   var isFolder = vimEl.classList.contains("folder");
@@ -134,6 +134,281 @@ function vimOpenFolder() {
   if (!vimEl || !vimEl.classList.contains("folder")) return;
   var node = vimEl._vimNode;
   if (node) toggle(node, vimEl);
+}
+
+function showModal(options) {
+  var prevFocus = document.activeElement;
+
+  var backdrop = document.createElement("div");
+  backdrop.className = "vim-modal-backdrop";
+
+  var form = document.createElement("form");
+  form.className = "vim-modal";
+
+  var heading = document.createElement("div");
+  heading.className = "vim-modal-title";
+  heading.innerText = options.title;
+  form.appendChild(heading);
+
+  var inputs = [];
+  for (var i = 0; i < options.fields.length; i++) {
+    (function (field) {
+      var label = document.createElement("label");
+      label.className = "vim-modal-field";
+      var p = document.createElement("p");
+      p.innerText = field.label;
+      var input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = field.placeholder || "";
+      input.value = field.value || "";
+      label.appendChild(p);
+      label.appendChild(input);
+      form.appendChild(label);
+      inputs.push(input);
+    })(options.fields[i]);
+  }
+
+  var buttons = document.createElement("div");
+  buttons.className = "vim-modal-buttons";
+  var cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.innerText = "Cancel";
+  cancel.onclick = close;
+  var submit = document.createElement("button");
+  submit.type = "submit";
+  submit.innerText = "Submit";
+  buttons.appendChild(cancel);
+  buttons.appendChild(submit);
+  form.appendChild(buttons);
+
+  function close() {
+    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    document.removeEventListener("keydown", onKeyDown, true);
+    if (prevFocus && prevFocus.isConnected && prevFocus.focus) prevFocus.focus();
+  }
+
+  function onKeyDown(event) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      close();
+    }
+  }
+
+  form.onsubmit = function (event) {
+    event.preventDefault();
+    var values = [];
+    for (var i = 0; i < inputs.length; i++) values.push(inputs[i].value.trim());
+    if (!options.onSubmit(values)) return;
+    close();
+  };
+
+  backdrop.onmousedown = function (event) {
+    if (event.target === backdrop) close();
+    return false;
+  };
+
+  document.addEventListener("keydown", onKeyDown, true);
+  backdrop.appendChild(form);
+  document.body.appendChild(backdrop);
+  inputs[0].focus();
+}
+
+function getDefaultParentId() {
+  if (root) {
+    for (var i = 0; i < root.length; i++) {
+      if (special.indexOf(root[i]) < 0 && /^\d+$/.test(root[i])) return root[i];
+    }
+  }
+  return "1";
+}
+
+function countPrevLiSiblings(li) {
+  var count = 0;
+  var prev = li.previousElementSibling;
+  while (prev) {
+    if (prev.tagName === "LI") count++;
+    prev = prev.previousElementSibling;
+  }
+  return count;
+}
+
+function findParentFolderId(li) {
+  var ul = li.parentNode;
+  if (!ul || ul.tagName !== "UL") return null;
+  var div = ul.parentNode;
+  if (!div || div.tagName !== "DIV") return null;
+  var prevA = div.previousElementSibling;
+  if (prevA && prevA.tagName === "A" && prevA._vimNode &&
+      prevA._vimNode.children && special.indexOf(prevA._vimNode.id) < 0) {
+    return prevA._vimNode.id;
+  }
+  return null;
+}
+
+function getInsertionContext() {
+  var context = { parentId: null, index: 0, replaceEmpty: false };
+
+  if (vimEl && vimEl._vimNode) {
+    var node = vimEl._vimNode;
+    var li = vimEl.parentNode;
+
+    if (node.id === "empty") {
+      context.replaceEmpty = true;
+      context.parentId = findParentFolderId(li);
+    } else {
+      context.parentId = findParentFolderId(li);
+      context.index = countPrevLiSiblings(li) + 1;
+    }
+  }
+
+  if (!context.parentId) context.parentId = getDefaultParentId();
+  return context;
+}
+
+function createBookmark() {
+  var context = getInsertionContext();
+  var emptyLi = context.replaceEmpty && vimEl ? vimEl.parentNode : null;
+  showModal({
+    title: "New bookmark",
+    fields: [
+      { label: "Name", placeholder: "Example" },
+      { label: "URL", placeholder: "example.com" },
+    ],
+    onSubmit: function (values) {
+      var url = values[1].trim();
+      if (!url) return false;
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
+      chrome.bookmarks.create(
+        {
+          parentId: context.parentId,
+          index: context.index,
+          title: values[0].trim() || url,
+          url: url,
+        },
+        function () {
+          if (chrome.runtime.lastError) console.warn("createBookmark:", chrome.runtime.lastError.message);
+          if (emptyLi && emptyLi.parentNode) emptyLi.parentNode.removeChild(emptyLi);
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
+}
+
+function createFolder() {
+  var context = getInsertionContext();
+  var emptyLi = context.replaceEmpty && vimEl ? vimEl.parentNode : null;
+  showModal({
+    title: "New folder",
+    fields: [{ label: "Name", placeholder: "New folder" }],
+    onSubmit: function (values) {
+      var title = values[0].trim();
+      if (!title) return false;
+      chrome.bookmarks.create(
+        { parentId: context.parentId, index: context.index, title: title },
+        function () {
+          if (chrome.runtime.lastError) console.warn("createFolder:", chrome.runtime.lastError.message);
+          if (emptyLi && emptyLi.parentNode) emptyLi.parentNode.removeChild(emptyLi);
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
+}
+
+function updateBookmark(node) {
+
+  showModal({
+    title: "Update Bookmark",
+    fields: [
+      { label: "Name", placeholder: "Bookmark Name", value: node.title },
+      { label: "URL", placeholder: "example.com", value: node.url }
+    ],
+    onSubmit: function (values) {
+      var title = values[0].trim();
+      var url = values[1].trim();
+      if (!url) return false;
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
+      if (!title) return false;
+      chrome.bookmarks.update(
+        node.id, { title: title || url, url },
+        function () {
+          if (chrome.runtime.lastError) console.warn("updateBookmark:", chrome.runtime.lastError.message);
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
+}
+
+function updateFolder(node) {
+  showModal({
+    title: "Update folder",
+    fields: [{ label: "Name", placeholder: "Folder Name", value: node.title }],
+    onSubmit: function (values) {
+      var title = values[0].trim();
+      if (!title) return false;
+      chrome.bookmarks.update(
+        node.id, { title: title },
+        function () {
+          if (chrome.runtime.lastError) console.warn("updateFolder:", chrome.runtime.lastError.message);
+          renderColumns();
+        },
+      );
+      return true;
+    },
+  });
+}
+
+function updateNode() {
+  if (!vimEl) return;
+
+  if (vimEl._vimNode) {
+    var node = vimEl._vimNode;
+    var isFolder = vimEl.classList.contains("folder");
+    if (isFolder) {
+      updateFolder(node);
+    }
+    else {
+      updateBookmark(node);
+    }
+  }
+}
+
+function deleteBookmark(node) {
+  chrome.bookmarks.remove(node.id,
+    function () {
+      if (chrome.runtime.lastError) console.warn("deleteBookmark:", chrome.runtime.lastError.message);
+      renderColumns();
+    }
+  );
+}
+
+function deleteFolder(node) {
+  chrome.bookmarks.removeTree(node.id,
+    function () {
+      if (chrome.runtime.lastError) console.warn("deleteFolder:", chrome.runtime.lastError.message);
+      renderColumns();
+    },
+  );
+}
+
+function deleteNode() {
+  if (!vimEl) return;
+
+  if (vimEl._vimNode) {
+    var node = vimEl._vimNode;
+    var isFolder = vimEl.classList.contains("folder");
+    if (isFolder) {
+      deleteFolder(node);
+    }
+    else {
+      deleteBookmark(node);
+    }
+  }
 }
 
 // Bookmark duplication
@@ -249,7 +524,7 @@ async function vimPasteAt(destY) {
           if (parentId) {
             var newNode = await copyBookmarkSubtree(id, parentId);
             if (newNode && newNode.id) {
-              addRow(newNode.id, destX, targetY + i);
+              addRow(newNode.id, destX, destY + i);
               added = true;
             }
           }
@@ -257,14 +532,14 @@ async function vimPasteAt(destY) {
       } catch (e) { }
     }
     if (!added) {
-      addRow(id, destX, targetY + i);
+      addRow(id, destX, destY + i);
     }
   }
 }
 
 function vimPaste(asColumn) {
-  if (asColumn) return addColumn(clipboard.ids, destX + 1);
-  return vimPasterAt(getCursorRow(vimCursor.x));
+  if (asColumn) return addColumn(clipboard.ids, vimCursor.x + 1);
+  return vimPasteAt(getCursorRow(vimCursor.x));
 }
 
 async function vimPasteAbove() {
@@ -301,26 +576,13 @@ function vimShowThemePicker() {
 document.addEventListener("keydown", function (event) {
   var tag = event.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  if (document.querySelector(".menu")) return;
+  if (document.querySelector(".menu") || document.querySelector(".vim-modal-backdrop"))
+    return;
 
   var key = event.key;
 
   if (event.ctrlKey) {
     return;
-  }
-
-  // multi-key buffer: g → gg
-  if (vimPending === "g") {
-    clearTimeout(vimPendingTimer);
-    vimPending = null;
-    if (key === "g") {
-      vimCursor.x = 0;
-      vimCursor.y = 0;
-      resolveCursor();
-      event.preventDefault();
-      return;
-    }
-    // fall through - first g is discarded
   }
 
   switch (key) {
@@ -353,21 +615,25 @@ document.addEventListener("keydown", function (event) {
       vimOpenFolder();
       event.preventDefault();
       break;
+    case 'n':
+      createBookmark();
+      event.preventDefault();
+      break;
+    case 'N':
+      createFolder();
+      event.preventDefault();
+      break;
+    case 'e':
+      event.preventDefault();
+      updateNode();
+      break;
+    case "d":
+      event.preventDefault();
+      deleteNode();
+      break;
+
     // TODO: Additional Features, review and implement
 
-    // case "g":
-    //   vimPending = "g";
-    //   vimPendingTimer = setTimeout(function () {
-    //     vimPending = null;
-    //   }, 500);
-    //   event.preventDefault();
-    //   break;
-    // case "G":
-    //   vimCursor.x = columns.length - 1;
-    //   vimCursor.y = Math.max(0, getVisibleLinks(vimCursor.x).length - 1);
-    //   resolveCursor();
-    //   event.preventDefault();
-    //   break;
     // case "v":
     //   if (vimEl && vimEl._vimNode) {
     //     var id = vimEl._vimNode.id;
@@ -386,7 +652,6 @@ document.addEventListener("keydown", function (event) {
     //   vimYank();
     //   event.preventDefault();
     //   break;
-    // case "d":
     // case "x":
     //   vimCut();
     //   event.preventDefault();

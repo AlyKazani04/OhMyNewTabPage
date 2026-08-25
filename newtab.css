@@ -132,6 +132,79 @@ body {
   outline: 1px dashed currentColor;
   outline-offset: -1px;
 }
+.vim-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+}
+.vim-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 24em;
+  padding: 1em;
+  color: #000;
+  font-size: 1.2em;
+  line-height: normal;
+  text-align: left;
+  background-color: #fafafa;
+  border: solid 1px #999;
+  border-radius: 3px;
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.3);
+}
+.vim-modal-title {
+  font-weight: bold;
+  margin-bottom: 0.8em;
+}
+.vim-modal-field {
+  display: flex;
+  align-items: center;
+  margin: 0 0 0.6em 0;
+}
+.vim-modal-field p {
+  float: none;
+  text-align: center;
+  flex-shrink: 0;
+  width: 3.5em;
+  line-height: inherit;
+}
+.vim-modal-field input {
+  width: auto;
+  flex: 1;
+  min-width: 14em;
+  margin: 0;
+  padding: 2px 4px;
+  border: solid 1px #bbb;
+  border-radius: 2px;
+}
+.vim-modal-field input:focus {
+  outline: none;
+  border-color: #57b0ff;
+  box-shadow: 0 0 2px #57b0ff;
+}
+.vim-modal-buttons {
+  margin-top: 0.8em;
+  text-align: right;
+}
+.vim-modal-buttons button {
+  width: auto;
+  margin: 0 0 0 0.5em;
+  padding: 2px 1em;
+  color: #000;
+  background-color: #fff;
+  border: solid 1px #999;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.vim-modal-buttons button:hover {
+  background-color: #e4f4ff;
+  border-color: #57b0ff;
+}
 #options,
 #options_button {
   position: absolute;

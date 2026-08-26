@@ -38,16 +38,10 @@ body {
   text-decoration: none;
   color: #555;
   padding: 0 0.8em;
-  border-radius: 0.2em;
   cursor: pointer;
   transition-property: color, background-color, box-shadow, opacity;
   transition-duration: 0.2s;
   transition-timing-function: ease-out;
-}
-#main a:hover {
-  color: #000;
-  background-color: #e4f4ff;
-  box-shadow: 0 0 7px #57b0ff;
 }
 .icon {
   display: inline-block;
@@ -97,7 +91,6 @@ body {
   cursor: default;
 }
 .menu a:hover {
-  background-color: #e4f4ff;
   border: solid 1px #57b0ff;
   margin: -1px;
   position: relative;
@@ -121,6 +114,10 @@ body {
 .hide-focus :focus-visible {
   outline: none;
 }
+.menu a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -1px;
+}
 .vim-cursor {
   outline: 2px solid currentColor;
   outline-offset: -1px;
@@ -131,6 +128,9 @@ body {
 .vim-selected {
   outline: 1px dashed currentColor;
   outline-offset: -1px;
+}
+.vim-cut {
+  opacity: 0.45;
 }
 .vim-modal-backdrop {
   position: fixed;
@@ -154,7 +154,6 @@ body {
   text-align: left;
   background-color: #fafafa;
   border: solid 1px #999;
-  border-radius: 3px;
   box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.3);
 }
 .vim-modal-title {
@@ -180,7 +179,6 @@ body {
   margin: 0;
   padding: 2px 4px;
   border: solid 1px #bbb;
-  border-radius: 2px;
 }
 .vim-modal-field input:focus {
   outline: none;
@@ -198,7 +196,6 @@ body {
   color: #000;
   background-color: #fff;
   border: solid 1px #999;
-  border-radius: 3px;
   cursor: pointer;
 }
 .vim-modal-buttons button:hover {

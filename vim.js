@@ -279,6 +279,7 @@ function showModal(options) {
   backdrop.appendChild(form);
   document.body.appendChild(backdrop);
   if (inputs.length > 0) inputs[0].focus();
+  else cancel.focus();
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +351,7 @@ function findParentFolderId(li) {
   if (!div || div.tagName !== "DIV") return null;
   var prevA = div.previousElementSibling;
   if (prevA && prevA.tagName === "A" && prevA._vimNode &&
-      prevA._vimNode.children && special.indexOf(prevA._vimNode.id) < 0) {
+    prevA._vimNode.children && special.indexOf(prevA._vimNode.id) < 0) {
     return prevA._vimNode.id;
   }
   return null;
@@ -371,9 +372,9 @@ function createNodeDialog(isFolder) {
   var fields = isFolder
     ? [{ label: "Name", placeholder: "New folder" }]
     : [
-        { label: "Name", placeholder: "Example" },
-        { label: "URL", placeholder: "example.com" },
-      ];
+      { label: "Name", placeholder: "Example" },
+      { label: "URL", placeholder: "example.com" },
+    ];
   showModal({
     title: isFolder ? "New folder" : "New bookmark",
     fields: fields,
@@ -412,9 +413,9 @@ function createBookmarkAt(props, afterId) {
     // only reuse the anchor index when it belongs to the same parent folder
     var index =
       results &&
-      results[0] &&
-      results[0].parentId === props.parentId &&
-      results[0].index != null
+        results[0] &&
+        results[0].parentId === props.parentId &&
+        results[0].index != null
         ? results[0].index + 1
         : null;
     finish(index);
@@ -431,9 +432,9 @@ function editNodeDialog() {
   var fields = isFolder
     ? [{ label: "Name", placeholder: "Folder name", value: node.title }]
     : [
-        { label: "Name", placeholder: "Bookmark name", value: node.title },
-        { label: "URL", placeholder: "example.com", value: node.url },
-      ];
+      { label: "Name", placeholder: "Bookmark name", value: node.title },
+      { label: "URL", placeholder: "example.com", value: node.url },
+    ];
   showModal({
     title: isFolder ? "Edit folder" : "Edit bookmark",
     fields: fields,
@@ -561,7 +562,7 @@ function placeInLayout(ids, x, y) {
 // only real bookmark folders/items may be clipped; virtual nodes ("top",
 // "empty", "device.X") and permanent roots would only produce API errors
 function clipTargetableId(id) {
-  return isRealBookmarkId(id) && root.indexOf(id) < 0;
+  return isRealBookmarkId(id) && Array.isArray(root) && root.indexOf(id) < 0;
 }
 
 function vimGetTargetIds() {
@@ -718,11 +719,11 @@ function syncLayoutAfterPaste(ids, parentId, below) {
   if (flatX > -1) {
     scheduleRestore(ids[0]);
     saveColumns(); // triggers the re-render
-  } else if (root.indexOf(parentId) > -1 && !inColumns(parentId)) {
-    // top level: land the cursor on the first pasted item once rendered
+  } else if (vimEl && vimEl._vimNode && coords && coords[vimEl._vimNode.id]) {
+    // top level (stored in the layout grid): land the cursor on the first pasted item once rendered
     scheduleRestore(ids[0]);
-    var row = getCursorTopLevelRow();
-    placeInLayout(ids, vimCursor.x, below ? row + 1 : row);
+    var pos = coords[vimEl._vimNode.id];
+    placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
   } else {
     // nested destination: items leave the page grid; the cursor simply
     // stays where it is

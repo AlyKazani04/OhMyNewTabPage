@@ -11,8 +11,8 @@ function render(node, target) {
   if (url) a.href = url;
   else a.tabIndex = -1;
 
-  var text = node.title || node.name || "";
-  if (!text && node.title === null) text = node.url || "";
+  var text = node.title || "";
+  if (!text && url) text = url;
   a.innerText = text;
 
   if (node.tooltip) a.title = node.tooltip;
@@ -322,16 +322,25 @@ function onMenuClick(item, ul) {
 }
 
 // renders a popup menu at given coordinates
-function renderMenu(items, x, y) {
+function renderMenu(items, x, y, label) {
   var ul = document.createElement("ul");
   ul.className = "menu";
+  ul.setAttribute("role", "menu");
+  if (label) ul.setAttribute("aria-label", label);
+  var prevFocus = document.activeElement;
+  ul._prevFocus = prevFocus;
+  var selectedAnchor = null;
   for (var i = 0; i < items.length; i++) {
     var li = document.createElement("li");
-    li.setAttribute('tabindex', '-1');
     if (items[i]) {
       var a = document.createElement("a");
       a.innerText = items[i].label;
       a.tabIndex = -1;
+      a.setAttribute("role", "menuitem");
+      if (items[i].selected === true) {
+        a.setAttribute("aria-checked", "true");
+        selectedAnchor = a;
+      }
       a.onclick = onMenuClick(items[i], ul);
 
       li.appendChild(a);
@@ -340,9 +349,11 @@ function renderMenu(items, x, y) {
     else continue;
 
     ul.appendChild(li);
-    li.focus();
   }
   document.body.appendChild(ul);
+  var firstAnchor = ul.querySelector("a");
+  if (selectedAnchor) selectedAnchor.focus();
+  else if (firstAnchor) firstAnchor.focus();
   ul.style.left =
     Math.max(
       Math.min(x, window.innerWidth + window.scrollX - ul.clientWidth),
@@ -372,7 +383,43 @@ function renderMenu(items, x, y) {
       return true;
     };
     document.onkeydown = function (event) {
-      if (event.code === 'Escape') closeMenu(ul);
+      if (event.code === 'Escape') {
+        closeMenu(ul);
+        return true;
+      }
+      var anchors = ul.querySelectorAll('a[role="menuitem"]');
+      if (!anchors.length) return true;
+      var idx = -1;
+      for (var i = 0; i < anchors.length; i++) {
+        if (anchors[i] === document.activeElement) {
+          idx = i;
+          break;
+        }
+      }
+      if (event.code === 'ArrowDown') {
+        event.preventDefault();
+        var next = idx < 0 ? 0 : (idx + 1) % anchors.length;
+        anchors[next].focus();
+      } else if (event.code === 'ArrowUp') {
+        event.preventDefault();
+        var prev = idx < 0 ? anchors.length - 1 : (idx - 1 + anchors.length) % anchors.length;
+        anchors[prev].focus();
+      } else if (event.code === 'Home') {
+        event.preventDefault();
+        anchors[0].focus();
+      } else if (event.code === 'End') {
+        event.preventDefault();
+        anchors[anchors.length - 1].focus();
+      } else if (event.code === 'Enter' || event.code === 'Space') {
+        event.preventDefault();
+        var target = event.target;
+        if (target && target.getAttribute && target.getAttribute('role') === 'menuitem') {
+          target.click();
+        } else {
+          var focused = ul.querySelector('a:focus');
+          if (focused) focused.click();
+        }
+      }
       return true;
     };
   }, 20);
@@ -388,6 +435,7 @@ function closeMenu(ul) {
   document.onmousedown = null;
   document.oncontextmenu = null;
   document.onkeydown = null;
+  if (ul && ul._prevFocus && ul._prevFocus.focus) ul._prevFocus.focus();
 }
 
 var dragIds;
@@ -466,6 +514,9 @@ function enableDragDrop() {
           target.style.borderLeft = bordercss;
           target.style.margin = "0 2px 0 -2px";
         }
+      } else if (target.tagName === "A") {
+        // folder container highlight
+        target.style.border = bordercss;
       }
     }
     return false;
@@ -480,6 +531,15 @@ function enableDragDrop() {
 
     var target = getDropTarget(event);
     if (!target) return false;
+
+    // drop into a folder container
+    if (target.tagName === "A" && target.classList.contains("folder")) {
+      folderMoveDrop(
+        dragIds,
+        target._vimNode ? target._vimNode.id : null,
+      );
+      return false;
+    }
 
     // calculate drop coordinates
     var x = getDropX(target, event);
@@ -499,6 +559,20 @@ function enableDragDrop() {
 function getDropTarget(event) {
   if (!dragIds) return null;
   var target = event.target;
+  // dropping a single item directly on a folder header uses the folder as
+  // the container, unless the pointer is in the top/bottom edge bands which
+  // keep the old sibling-reorder behavior (column drags are never containers)
+  var a =
+    target && target.tagName === "A"
+      ? target
+      : target.parentNode && target.parentNode.tagName === "A"
+        ? target.parentNode
+        : null;
+  if (a && a.classList.contains("folder") && dragIds.length === 1) {
+    var rect = a.getBoundingClientRect();
+    var cy = event.clientY;
+    if (cy - rect.top > 6 && rect.bottom - cy > 6) return a;
+  }
   if (
     target &&
     (target.tagName === "A" || target.parentNode.tagName === "A") &&
@@ -590,89 +664,54 @@ function updateTooltips() {
 
 // gets function that returns children of node
 function getChildrenFunction(node) {
-  switch (node.id) {
-    case "top":
-      return function (callback) {
-        if (chrome.topSites)
-          chrome.topSites.get(function (result) {
-            callback(result.slice(0, getConfig("number_top")));
-          });
-        else callback([]);
-      };
-    case "recent":
-      return function (callback) {
-        chrome.bookmarks.getRecent(
-          getConfig("number_recent"),
-          function (result) {
-            callback(result);
-          },
-        );
-      };
-    case "closed":
-      return function (callback) {
-        getClosed(function (result) {
-          callback(result);
-        });
-      };
-    case "devices":
-      return function (callback) {
-        getDevices(function (result) {
-          callback(result);
-        });
-      };
-    default:
-      if (node.children)
-        return function (callback) {
-          callback(node.children);
-        };
-      else
-        return function (callback) {
-          chrome.bookmarks.getSubTree(node.id, function (result) {
-            if (chrome.runtime.lastError) {
-              console.warn(chrome.runtime.lastError.message);
-            }
-            if (result) callback(result[0].children);
-            else {
-              // remove missing bookmark locations
-              if (coords[node.id])
-                removeRow(coords[node.id].x, coords[node.id].y);
-              callback([]);
-            }
-          });
-        };
+  if (SPECIAL[node.id]) {
+    var load = SPECIAL[node.id].children;
+    return (
+      load ||
+      function (callback) {
+        callback([]);
+      }
+    );
   }
+  if (node.children)
+    return function (callback) {
+      callback(node.children);
+    };
+  return function (callback) {
+    chrome.bookmarks.getSubTree(node.id, function (result) {
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError.message);
+      }
+      if (result) callback(result[0].children);
+      else {
+        // remove missing bookmark locations
+        if (coords[node.id]) removeRow(coords[node.id].x, coords[node.id].y);
+        callback([]);
+      }
+    });
+  };
 }
 
 // gets the subtree for given id
 function getSubTree(id, callback) {
-  switch (id) {
-    case "top":
-      callback([{ title: "Most visited", id: "top", children: true }]);
-      break;
-    case "apps":
-      callback([{ title: "Apps", id: "apps", url: "chrome://apps" }]);
-      break;
-    case "recent":
-      callback([{ title: "Recent bookmarks", id: "recent", children: true }]);
-      break;
-    case "closed":
-      callback([{ title: "Recently closed", id: "closed", children: true }]);
-      break;
-    case "devices":
-      callback([{ title: "Other devices", id: "devices", children: true }]);
-      break;
-    default:
-      chrome.bookmarks.getSubTree(id, function (result) {
-        if (chrome.runtime.lastError) {
-          console.warn(chrome.runtime.lastError.message);
-        }
-        if (result) callback(result);
-        else {
-          // remove missing bookmark locations
-          if (coords[id]) removeRow(coords[id].x, coords[id].y);
-        }
-      });
+  if (SPECIAL[id]) {
+    var s = SPECIAL[id];
+    var node = { title: s.label, id: id };
+    if (s.url) node.url = s.url;
+    else node.children = true;
+    callback([node]);
+    return;
   }
+  chrome.bookmarks.getSubTree(id, function (result) {
+    if (chrome.runtime.lastError) {
+      console.warn(chrome.runtime.lastError.message);
+    }
+    if (result) callback(result);
+    else {
+      // remove missing bookmark locations
+      if (coords[id]) removeRow(coords[id].x, coords[id].y);
+    }
+  });
 }
 
 // sets css classes for node
@@ -682,15 +721,9 @@ function setClass(target, node, isopen) {
   if (isopen) target.classList.add("open");
   else target.classList.remove("open");
 
-  switch (node.id) {
-    case "top":
-    case "apps":
-    case "recent":
-    case "closed":
-    case "devices":
-    case "empty":
-      target.classList.add(node.id);
-      target.setAttribute('tabindex', '-1');
+  if (SPECIAL[node.id] || node.id === "empty") {
+    target.classList.add(node.id);
+    target.setAttribute("tabindex", "-1");
   }
 }
 
@@ -839,7 +872,44 @@ function openLink(node, newtab) {
 var columns; // columns[x][y] = id
 var root; // root[] = id
 var coords; // coords[id] = {x:x, y:y}
-var special = ["apps", "top", "recent", "closed", "devices"];
+
+// virtual (non-bookmark) top level entries
+var SPECIAL = {
+  apps: {
+    label: "Apps",
+    url: "chrome://apps",
+    children: null,
+  },
+  top: {
+    label: "Most visited",
+    children: function (callback) {
+      if (chrome.topSites)
+        chrome.topSites.get(function (result) {
+          callback(result.slice(0, getConfig("number_top")));
+        });
+      else callback([]);
+    },
+  },
+  recent: {
+    label: "Recent bookmarks",
+    children: function (callback) {
+      chrome.bookmarks.getRecent(getConfig("number_recent"), callback);
+    },
+  },
+  closed: {
+    label: "Recently closed",
+    children: function (callback) {
+      getClosed(callback);
+    },
+  },
+  devices: {
+    label: "Other devices",
+    children: function (callback) {
+      getDevices(callback);
+    },
+  },
+};
+var special = Object.keys(SPECIAL);
 
 // ensure root folders are included
 function verifyColumns() {
@@ -1086,7 +1156,7 @@ var config = {
   font: "Sans-serif",
   font_size: 16,
   font_weight: 400,
-  theme: "Default",
+  theme: "Nord",
   font_color: "#555555",
   background_color: "#ffffff",
   highlight_color: "#e4f4ff",
@@ -1125,83 +1195,96 @@ var config = {
 
 // color theme values
 var themes = {
-  Default: {},
-  Classic: {
-    font_color: "#000000",
-    background_color: "#ffffff",
-    highlight_color: "#3399ff",
-    highlight_font_color: "#ffffff",
-    shadow_color: "#97cbff",
+  Nord: {
+    font_color: "#d8dee9",
+    background_color: "#2e3440",
+    highlight_color: "#81a1c1",
+    highlight_font_color: "#2e3440",
+    shadow_color: "#222730",
   },
-  Dusk: {
-    font_color: "#c8b9be",
-    background_color: "#56546b",
-    highlight_color: "#494d5a",
-    highlight_font_color: "#ffd275",
-    shadow_color: "#000000",
+  Catppuccin: {
+    font_color: "#cdd6f4",
+    background_color: "#1e1e2e",
+    highlight_color: "#89b4fa",
+    highlight_font_color: "#1e1e2e",
+    shadow_color: "#161622",
   },
-  Elegant: {
-    font_color: "#888888",
-    background_color: "#f6f6f6",
-    highlight_color: "#ffffff",
-    highlight_font_color: "#000000",
-    shadow_color: "#aaaaaa",
+  "Catppuccin Latte": {
+    font_color: "#4c4f69",
+    background_color: "#eff1f5",
+    highlight_color: "#1e66f5",
+    highlight_font_color: "#eff1f5",
+    shadow_color: "#dce0e8",
   },
-  Frosty: {
-    font_color: "#3e5e82",
-    background_color: "#e4eef3",
-    highlight_color: "#0080c0",
-    highlight_font_color: "#ffffff",
-    shadow_color: "#8080ff",
+  "Rosé Pine Dawn": {
+    font_color: "#575279",
+    background_color: "#faf4ed",
+    highlight_color: "#56949f",
+    highlight_font_color: "#faf4ed",
+    shadow_color: "#f2e9e1",
   },
-  Hacker: {
-    font_color: "#00ff00",
-    background_color: "#000000",
-    highlight_color: "#00ff00",
-    highlight_font_color: "#000000",
-    shadow_color: "#ff0000",
+  "Rosé Pine": {
+    font_color: "#e0def4",
+    background_color: "#191724",
+    highlight_color: "#c4a7e7",
+    highlight_font_color: "#191724",
+    shadow_color: "#1f1d2e",
   },
-  Melon: {
-    font_color: "#594526",
-    background_color: "#f8ffe1",
-    highlight_color: "#ff8000",
-    highlight_font_color: "#ffff80",
-    shadow_color: "#ff80c0",
+  "Tokyo Night": {
+    font_color: "#c0caf5",
+    background_color: "#1a1b26",
+    highlight_color: "#7aa2f7",
+    highlight_font_color: "#1a1b26",
+    shadow_color: "#13141c",
   },
-  Midnight: {
-    font_color: "#bfdfff",
-    background_color: "#101827",
-    highlight_color: "#000000",
-    highlight_font_color: "#80ecff",
-    shadow_color: "#0080ff",
+  "Tokyo Night Day": {
+    font_color: "#3760bf",
+    background_color: "#e1e2e7",
+    highlight_color: "#2e7de9",
+    highlight_font_color: "#e1e2e7",
+    shadow_color: "#d0d1d7",
   },
-  Slate: {
-    font_color: "#555555",
-    background_color: "#b7babf",
-    highlight_color: "#aaaaaa",
-    highlight_font_color: "#000000",
-    shadow_color: "#2a2a2a",
+  Gruvbox: {
+    font_color: "#d4be98",
+    background_color: "#282828",
+    highlight_color: "#7daea3",
+    highlight_font_color: "#282828",
+    shadow_color: "#1e1e1e",
   },
-  Trees: {
-    font_color: "#cdd088",
-    background_color: "#566157",
-    highlight_color: "#4d674b",
-    highlight_font_color: "#ffff80",
-    shadow_color: "#183010",
+  Everforest: {
+    font_color: "#d3c6aa",
+    background_color: "#2d353b",
+    highlight_color: "#7fbbb3",
+    highlight_font_color: "#2d353b",
+    shadow_color: "#21272c",
   },
-  Valentine: {
-    font_color: "#895fc2",
-    background_color: "#eae1ff",
-    highlight_color: "#ffb7f0",
-    highlight_font_color: "#f00000",
-    shadow_color: "#ffffff",
+  Hackerman: {
+    font_color: "#ddf7ff",
+    background_color: "#0B0C16",
+    highlight_color: "#82FB9C",
+    highlight_font_color: "#0B0C16",
+    shadow_color: "#080910",
   },
-  Warm: {
-    font_color: "#824100",
-    background_color: "#ffeedd",
-    highlight_color: "#fffae8",
-    highlight_font_color: "#800000",
-    shadow_color: "#d98764",
+  "Matte Black": {
+    font_color: "#bebebe",
+    background_color: "#121212",
+    highlight_color: "#e68e0d",
+    highlight_font_color: "#121212",
+    shadow_color: "#0d0d0d",
+  },
+  "Osaka Jade": {
+    font_color: "#C1C497",
+    background_color: "#111c18",
+    highlight_color: "#509475",
+    highlight_font_color: "#111c18",
+    shadow_color: "#0c1512",
+  },
+  "Nord Light": {
+    font_color: "#2e3440",
+    background_color: "#eceff4",
+    highlight_color: "#5e81ac",
+    highlight_font_color: "#eceff4",
+    shadow_color: "#d8dee9",
   },
 };
 var theme = {};
@@ -1280,9 +1363,17 @@ function getStyle(key, value) {
     case "background_size":
       return "body { background-size: " + value + "; }";
     case "highlight_font_color":
-      return "#main a:hover { color: " + value + "; }";
+      return "";
     case "highlight_color":
-      return "#main a:hover { background-color: " + value + "; }";
+      return (
+        "#main a:hover { color: " +
+        value +
+        "; } #main a.vim-cursor { outline-color: " +
+        value +
+        "; } .menu a:hover, .menu a:focus-visible { color: " +
+        value +
+        "; }"
+      );
     case "shadow_color":
       return (
         "#main a:hover { box-shadow: 0 0 " +
@@ -1521,12 +1612,7 @@ function initSettings() {
         var exports = document.getElementById("options_export");
         var imports = document.getElementById("options_import");
         var replacer = function (key, value) {
-          if (
-            key === "options.background_image_file" ||
-            key === "weather.cache"
-          ) {
-            return undefined;
-          }
+          if (key === "options.background_image_file") return undefined;
           return value;
         };
         exports.value = JSON.stringify(localStorage, replacer);

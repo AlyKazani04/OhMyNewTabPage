@@ -1,21 +1,30 @@
 "use strict";
 
-// vim.js - Vim-style keyboard navigation, theme picker, clipboard
+// vim.js - Vim-style keyboard navigation, bookmark CRUD, clipboard and theme picker
+//
+// Depends on globals from newtab.js (loaded first):
+//   columns, root, special, toggle, saveColumns, renderColumns,
+//   getConfig, setConfig, themes, showOptions, renderMenu
 
-// State
+// ---------------------------------------------------------------------------
+// state
+// ---------------------------------------------------------------------------
+
 var vimCursor = { x: 0, y: 0 };
 var vimEl = null;
-var vimPending = null;
-var vimPendingTimer = null;
 var vimSelected = new Set();
 var clipboard = { ids: [], mode: null };
+var vimPendingRestore = null;
 
-// Helpers
+// ---------------------------------------------------------------------------
+// traversal and cursor
+// ---------------------------------------------------------------------------
+
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
 }
 
-// Depth-first traversal of all visible <a> elements in a column
+// depth-first traversal of all visible <a> elements in a column
 function getVisibleLinks(x) {
   var column = document.getElementsByClassName("column")[x];
   if (!column) return [];
@@ -52,26 +61,33 @@ function collectLinks(container, links) {
   }
 }
 
-function getCursorRow(x) {
-  var links = getVisibleLinks(x);
-  if (!links || links.length === 0 || vimCursor.y < 0 || vimCursor.y >= links.length) {
-    return (columns[x] && columns[x].length) ? columns[x].length : 0;
+// top-level row (within its column) of the item under the cursor
+function getCursorTopLevelRow() {
+  var fallback = columns[vimCursor.x] ? columns[vimCursor.x].length : 0;
+  if (!vimEl) return fallback;
+  // climb to the <ul> that sits directly under the column
+  var ul = vimEl.parentNode;
+  while (
+    ul &&
+    !(
+      ul.tagName === "UL" &&
+      ul.parentNode.classList &&
+      ul.parentNode.classList.contains("column")
+    )
+  )
+    ul = ul.parentNode;
+  if (!ul) return fallback;
+  // descend from the anchor to the top-level <li>
+  var li = vimEl;
+  while (li && li.parentNode !== ul) li = li.parentNode;
+  if (!li || li.tagName !== "LI") return fallback;
+  var row = 0;
+  var sibling = li.previousElementSibling;
+  while (sibling) {
+    if (sibling.tagName === "LI") row++;
+    sibling = sibling.previousElementSibling;
   }
-  var el = links[vimCursor.y];
-  var curr = el;
-  while (curr && curr !== document.body) {
-    if (curr._vimNode && curr._vimNode.id && coords[curr._vimNode.id] !== undefined) {
-      return coords[curr._vimNode.id].y;
-    }
-    if (curr.tagName === "LI" && curr.firstChild && curr.firstChild._vimNode) {
-      var id = curr.firstChild._vimNode.id;
-      if (coords[id] !== undefined) {
-        return coords[id].y;
-      }
-    }
-    curr = curr.parentNode;
-  }
-  return (columns[x] && columns[x].length) ? columns[x].length : 0;
+  return row;
 }
 
 function updateCursorVisuals() {
@@ -85,6 +101,7 @@ function updateCursorVisuals() {
     vimEl.scrollIntoView({ block: "nearest" });
   }
 
+  var cutting = clipboard.mode === "cut";
   var allLinks = document.querySelectorAll("#main a");
   for (var i = 0; i < allLinks.length; i++) {
     var link = allLinks[i];
@@ -94,18 +111,62 @@ function updateCursorVisuals() {
     } else {
       link.classList.remove("vim-selected");
     }
+    if (cutting && id && clipboard.ids.indexOf(id) > -1) {
+      link.classList.add("vim-cut");
+    } else {
+      link.classList.remove("vim-cut");
+    }
   }
 }
 
 function resolveCursor() {
   if (!columns || columns.length === 0) return;
   vimCursor.x = clamp(vimCursor.x, 0, columns.length - 1);
+  if (vimPendingRestore != null) restoreCursor(vimPendingRestore);
   var links = getVisibleLinks(vimCursor.x);
   vimCursor.y = clamp(vimCursor.y, 0, Math.max(0, links.length - 1));
   updateCursorVisuals();
 }
 
+// put the cursor back on node id after a re-render (retried until rendered)
+function scheduleRestore(id) {
+  vimPendingRestore = id;
+  setTimeout(function () {
+    if (vimPendingRestore === id) vimPendingRestore = null;
+  }, 2000);
+}
+
+function restoreCursor(id) {
+  for (var x = 0; x < columns.length; x++) {
+    if (columns[x].indexOf(id) === -1) continue;
+    vimCursor.x = x;
+    var links = getVisibleLinks(x);
+    for (var i = 0; i < links.length; i++) {
+      if (links[i]._vimNode && links[i]._vimNode.id === id) {
+        vimCursor.y = i;
+        break;
+      }
+    }
+    vimPendingRestore = null;
+    return;
+  }
+  // fallback: the id may live inside a rendered folder rather than the
+  // layout grid (e.g. a child of a flattened single-folder column)
+  for (var x = 0; x < columns.length; x++) {
+    var links = getVisibleLinks(x);
+    for (var i = 0; i < links.length; i++) {
+      if (links[i]._vimNode && links[i]._vimNode.id === id) {
+        vimCursor.x = x;
+        vimCursor.y = i;
+        vimPendingRestore = null;
+        return;
+      }
+    }
+  }
+}
+
 function moveCursor(dx, dy) {
+  if (!columns || columns.length === 0) return;
   if (dx !== 0) {
     vimCursor.x = clamp(vimCursor.x + dx, 0, columns.length - 1);
     var links = getVisibleLinks(vimCursor.x);
@@ -118,7 +179,10 @@ function moveCursor(dx, dy) {
   updateCursorVisuals();
 }
 
-// CRUD basics
+// ---------------------------------------------------------------------------
+// activation
+// ---------------------------------------------------------------------------
+
 function vimActivate() {
   if (!vimEl) return;
   var isFolder = vimEl.classList.contains("folder");
@@ -135,6 +199,10 @@ function vimOpenFolder() {
   var node = vimEl._vimNode;
   if (node) toggle(node, vimEl);
 }
+
+// ---------------------------------------------------------------------------
+// modal dialog
+// ---------------------------------------------------------------------------
 
 function showModal(options) {
   var prevFocus = document.activeElement;
@@ -176,7 +244,7 @@ function showModal(options) {
   cancel.onclick = close;
   var submit = document.createElement("button");
   submit.type = "submit";
-  submit.innerText = "Submit";
+  submit.innerText = options.submitLabel || "Submit";
   buttons.appendChild(cancel);
   buttons.appendChild(submit);
   form.appendChild(buttons);
@@ -210,8 +278,61 @@ function showModal(options) {
   document.addEventListener("keydown", onKeyDown, true);
   backdrop.appendChild(form);
   document.body.appendChild(backdrop);
-  inputs[0].focus();
+  if (inputs.length > 0) inputs[0].focus();
+  else cancel.focus();
 }
+
+// ---------------------------------------------------------------------------
+// bookmark api helpers
+// ---------------------------------------------------------------------------
+
+function bmGet(id) {
+  return new Promise(function (resolve) {
+    chrome.bookmarks.get(id, function (results) {
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError.message);
+        resolve(null);
+      } else resolve(results);
+    });
+  });
+}
+
+// like bmGet, but includes the children of the requested node
+function bmGetSubTree(id) {
+  return new Promise(function (resolve) {
+    chrome.bookmarks.getSubTree(id, function (results) {
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError.message);
+        resolve(null);
+      } else resolve(results);
+    });
+  });
+}
+
+function bmCreate(props) {
+  return new Promise(function (resolve) {
+    chrome.bookmarks.create(props, function (result) {
+      if (chrome.runtime.lastError) {
+        console.warn("bookmark create failed:", chrome.runtime.lastError.message);
+        resolve(null);
+      } else resolve(result);
+    });
+  });
+}
+
+function isRealBookmarkId(id) {
+  return /^\d+$/.test(String(id));
+}
+
+function normalizeUrl(url) {
+  url = url.trim();
+  if (url && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
+  return url;
+}
+
+// ---------------------------------------------------------------------------
+// creation and editing
+// ---------------------------------------------------------------------------
 
 function getDefaultParentId() {
   if (root) {
@@ -222,16 +343,7 @@ function getDefaultParentId() {
   return "1";
 }
 
-function countPrevLiSiblings(li) {
-  var count = 0;
-  var prev = li.previousElementSibling;
-  while (prev) {
-    if (prev.tagName === "LI") count++;
-    prev = prev.previousElementSibling;
-  }
-  return count;
-}
-
+// resolves the real bookmark folder containing the given list item
 function findParentFolderId(li) {
   var ul = li.parentNode;
   if (!ul || ul.tagName !== "UL") return null;
@@ -239,314 +351,467 @@ function findParentFolderId(li) {
   if (!div || div.tagName !== "DIV") return null;
   var prevA = div.previousElementSibling;
   if (prevA && prevA.tagName === "A" && prevA._vimNode &&
-      prevA._vimNode.children && special.indexOf(prevA._vimNode.id) < 0) {
+    prevA._vimNode.children && special.indexOf(prevA._vimNode.id) < 0) {
     return prevA._vimNode.id;
   }
   return null;
 }
 
+// where a newly created item should go: parent folder + optional anchor node
 function getInsertionContext() {
-  var context = { parentId: null, index: 0, replaceEmpty: false };
-
-  if (vimEl && vimEl._vimNode) {
-    var node = vimEl._vimNode;
-    var li = vimEl.parentNode;
-
-    if (node.id === "empty") {
-      context.replaceEmpty = true;
-      context.parentId = findParentFolderId(li);
-    } else {
-      context.parentId = findParentFolderId(li);
-      context.index = countPrevLiSiblings(li) + 1;
-    }
-  }
-
-  if (!context.parentId) context.parentId = getDefaultParentId();
+  var context = { parentId: getDefaultParentId(), afterId: null };
+  if (!(vimEl && vimEl._vimNode)) return context;
+  var parentId = findParentFolderId(vimEl.parentNode);
+  if (parentId) context.parentId = parentId;
+  if (vimEl._vimNode.id !== "empty") context.afterId = vimEl._vimNode.id;
   return context;
 }
 
-function createBookmark() {
+function createNodeDialog(isFolder) {
   var context = getInsertionContext();
-  var emptyLi = context.replaceEmpty && vimEl ? vimEl.parentNode : null;
-  showModal({
-    title: "New bookmark",
-    fields: [
+  var fields = isFolder
+    ? [{ label: "Name", placeholder: "New folder" }]
+    : [
       { label: "Name", placeholder: "Example" },
       { label: "URL", placeholder: "example.com" },
-    ],
-    onSubmit: function (values) {
-      var url = values[1].trim();
-      if (!url) return false;
-      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
-      chrome.bookmarks.create(
-        {
-          parentId: context.parentId,
-          index: context.index,
-          title: values[0].trim() || url,
-          url: url,
-        },
-        function () {
-          if (chrome.runtime.lastError) console.warn("createBookmark:", chrome.runtime.lastError.message);
-          if (emptyLi && emptyLi.parentNode) emptyLi.parentNode.removeChild(emptyLi);
-          renderColumns();
-        },
-      );
-      return true;
-    },
-  });
-}
-
-function createFolder() {
-  var context = getInsertionContext();
-  var emptyLi = context.replaceEmpty && vimEl ? vimEl.parentNode : null;
+    ];
   showModal({
-    title: "New folder",
-    fields: [{ label: "Name", placeholder: "New folder" }],
+    title: isFolder ? "New folder" : "New bookmark",
+    fields: fields,
+    submitLabel: "Create",
     onSubmit: function (values) {
       var title = values[0].trim();
-      if (!title) return false;
-      chrome.bookmarks.create(
-        { parentId: context.parentId, index: context.index, title: title },
-        function () {
-          if (chrome.runtime.lastError) console.warn("createFolder:", chrome.runtime.lastError.message);
-          if (emptyLi && emptyLi.parentNode) emptyLi.parentNode.removeChild(emptyLi);
-          renderColumns();
-        },
-      );
-      return true;
-    },
-  });
-}
-
-function updateBookmark(node) {
-
-  showModal({
-    title: "Update Bookmark",
-    fields: [
-      { label: "Name", placeholder: "Bookmark Name", value: node.title },
-      { label: "URL", placeholder: "example.com", value: node.url }
-    ],
-    onSubmit: function (values) {
-      var title = values[0].trim();
-      var url = values[1].trim();
-      if (!url) return false;
-      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) url = "https://" + url;
-      if (!title) return false;
-      chrome.bookmarks.update(
-        node.id, { title: title || url, url },
-        function () {
-          if (chrome.runtime.lastError) console.warn("updateBookmark:", chrome.runtime.lastError.message);
-          renderColumns();
-        },
-      );
-      return true;
-    },
-  });
-}
-
-function updateFolder(node) {
-  showModal({
-    title: "Update folder",
-    fields: [{ label: "Name", placeholder: "Folder Name", value: node.title }],
-    onSubmit: function (values) {
-      var title = values[0].trim();
-      if (!title) return false;
-      chrome.bookmarks.update(
-        node.id, { title: title },
-        function () {
-          if (chrome.runtime.lastError) console.warn("updateFolder:", chrome.runtime.lastError.message);
-          renderColumns();
-        },
-      );
-      return true;
-    },
-  });
-}
-
-function updateNode() {
-  if (!vimEl) return;
-
-  if (vimEl._vimNode) {
-    var node = vimEl._vimNode;
-    var isFolder = vimEl.classList.contains("folder");
-    if (isFolder) {
-      updateFolder(node);
-    }
-    else {
-      updateBookmark(node);
-    }
-  }
-}
-
-function deleteBookmark(node) {
-  chrome.bookmarks.remove(node.id,
-    function () {
-      if (chrome.runtime.lastError) console.warn("deleteBookmark:", chrome.runtime.lastError.message);
-      renderColumns();
-    }
-  );
-}
-
-function deleteFolder(node) {
-  chrome.bookmarks.removeTree(node.id,
-    function () {
-      if (chrome.runtime.lastError) console.warn("deleteFolder:", chrome.runtime.lastError.message);
-      renderColumns();
-    },
-  );
-}
-
-function deleteNode() {
-  if (!vimEl) return;
-
-  if (vimEl._vimNode) {
-    var node = vimEl._vimNode;
-    var isFolder = vimEl.classList.contains("folder");
-    if (isFolder) {
-      deleteFolder(node);
-    }
-    else {
-      deleteBookmark(node);
-    }
-  }
-}
-
-// Bookmark duplication
-async function copyBookmarkSubtree(sourceId, destParentId) {
-  var results = await new Promise(function (resolve) {
-    chrome.bookmarks.getSubTree(sourceId, (res) => {
-      if (chrome.runtime.lastError) {
-        console.warn(chrome.runtime.lastError);
-        resolve(null);
+      var props = { parentId: context.parentId };
+      if (isFolder) {
+        if (!title) return false;
+        props.title = title;
+      } else {
+        var url = normalizeUrl(values[1]);
+        if (!url) return false;
+        props.title = title || url;
+        props.url = url;
       }
-      else resolve(res);
+      createBookmarkAt(props, context.afterId);
+      return true;
+    },
+  });
+}
+
+// creates the bookmark, inserting it after afterId when given
+function createBookmarkAt(props, afterId) {
+  var finish = function (index) {
+    if (index != null) props.index = index;
+    chrome.bookmarks.create(props, function (result) {
+      if (chrome.runtime.lastError)
+        console.warn("create failed:", chrome.runtime.lastError.message);
+      else if (result) scheduleRestore(result.id);
+      renderColumns();
     });
+  };
+  if (!afterId) return finish(null);
+  bmGet(afterId).then(function (results) {
+    // only reuse the anchor index when it belongs to the same parent folder
+    var index =
+      results &&
+        results[0] &&
+        results[0].parentId === props.parentId &&
+        results[0].index != null
+        ? results[0].index + 1
+        : null;
+    finish(index);
+  }, function () {
+    finish(null);
   });
-  if (!results || results.length === 0) return null;
-  var rootNode = results[0];
-
-  async function recursiveClone(node, parentId) {
-    var newNode;
-    if (node.url) {
-      newNode = await chrome.bookmarks.create({
-        parentId: parentId,
-        title: node.title,
-        url: node.url,
-      });
-    } else {
-      newNode = await chrome.bookmarks.create({
-        parentId: parentId,
-        title: node.title,
-      });
-      if (node.children) {
-        for (var i = 0; i < node.children.length; i++) {
-          await recursiveClone(node.children[i], newNode.id);
-        }
-      }
-    }
-    return newNode;
-  }
-
-  return await recursiveClone(rootNode, destParentId);
 }
 
-// Clipboard
+function editNodeDialog() {
+  if (!vimEl || !vimEl._vimNode) return;
+  var node = vimEl._vimNode;
+  if (!isRealBookmarkId(node.id)) return; // virtual nodes are not editable
+  var isFolder = vimEl.classList.contains("folder");
+  var fields = isFolder
+    ? [{ label: "Name", placeholder: "Folder name", value: node.title }]
+    : [
+      { label: "Name", placeholder: "Bookmark name", value: node.title },
+      { label: "URL", placeholder: "example.com", value: node.url },
+    ];
+  showModal({
+    title: isFolder ? "Edit folder" : "Edit bookmark",
+    fields: fields,
+    submitLabel: "Save",
+    onSubmit: function (values) {
+      var props = {};
+      if (isFolder) {
+        var title = values[0].trim();
+        if (!title) return false;
+        props.title = title;
+      } else {
+        var url = normalizeUrl(values[1]);
+        if (!url) return false;
+        props.title = values[0].trim() || url;
+        props.url = url;
+      }
+      chrome.bookmarks.update(node.id, props, function () {
+        if (chrome.runtime.lastError)
+          console.warn("edit failed:", chrome.runtime.lastError.message);
+        else scheduleRestore(node.id);
+        renderColumns();
+      });
+      return true;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// deletion
+// ---------------------------------------------------------------------------
+
+function vimDelete() {
+  if (!vimEl || !vimEl._vimNode) return;
+  var ids = vimGetTargetIds(); // already filtered to real bookmarks
+  if (ids.length === 0) return;
+  var message;
+  if (vimSelected.size === 0) {
+    var node = vimEl._vimNode;
+    message = 'Delete "' + (node.title || node.url || "this item") + '"?';
+  } else {
+    message = "Delete " + ids.length + " selected item(s)?";
+  }
+  showModal({
+    title: message,
+    fields: [],
+    submitLabel: "Delete",
+    onSubmit: function () {
+      deleteBookmarksByIds(ids);
+      return true;
+    },
+  });
+}
+
+function deleteBookmarksByIds(ids) {
+  var next = function (i) {
+    if (i >= ids.length) {
+      // prune layout entries for deleted top-level items instead of letting
+      // the renderer discover them missing
+      var topLevel = ids.filter(function (id) {
+        return coords[id];
+      });
+      if (topLevel.length > 0) {
+        removeFromLayout(topLevel);
+        saveColumns();
+      } else {
+        renderColumns();
+      }
+      return;
+    }
+    bmGet(ids[i]).then(function (results) {
+      if (!results || !results[0]) {
+        next(i + 1);
+        return;
+      }
+      var done = function () {
+        if (chrome.runtime.lastError)
+          console.warn("delete failed:", chrome.runtime.lastError.message);
+        next(i + 1);
+      };
+      if (results[0].url) chrome.bookmarks.remove(ids[i], done);
+      else chrome.bookmarks.removeTree(ids[i], done);
+    });
+  };
+  next(0);
+}
+
+// ---------------------------------------------------------------------------
+// layout manipulation (batched: one save + re-render per operation)
+// ---------------------------------------------------------------------------
+
+// removes ids from the column layout
+function removeFromLayout(ids) {
+  for (var x = columns.length - 1; x >= 0; x--) {
+    var col = columns[x];
+    for (var y = col.length - 1; y >= 0; y--) {
+      if (ids.indexOf(col[y]) > -1) col.splice(y, 1);
+    }
+    if (col.length === 0) columns.splice(x, 1);
+  }
+}
+
+// moves ids into column x at row y and saves (single re-render)
+function placeInLayout(ids, x, y) {
+  for (var i = columns.length - 1; i >= 0; i--) {
+    var col = columns[i];
+    for (var j = col.length - 1; j >= 0; j--) {
+      if (ids.indexOf(col[j]) > -1) col.splice(j, 1);
+    }
+    if (col.length === 0) {
+      columns.splice(i, 1);
+      if (i < x) x--;
+    }
+  }
+  while (columns.length <= x) columns.push([]);
+  if (y == null || y > columns[x].length) y = columns[x].length;
+  if (y < 0) y = 0;
+  Array.prototype.splice.apply(columns[x], [y, 0].concat(ids));
+  saveColumns();
+}
+
+// ---------------------------------------------------------------------------
+// clipboard
+// ---------------------------------------------------------------------------
+
+// only real bookmark folders/items may be clipped; virtual nodes ("top",
+// "empty", "device.X") and permanent roots would only produce API errors
+function clipTargetableId(id) {
+  return isRealBookmarkId(id) && Array.isArray(root) && root.indexOf(id) < 0;
+}
+
 function vimGetTargetIds() {
-  if (vimSelected.size > 0) return Array.from(vimSelected);
-  if (vimEl && vimEl._vimNode) return [vimEl._vimNode.id];
-  return [];
+  var ids =
+    vimSelected.size > 0
+      ? Array.from(vimSelected)
+      : vimEl && vimEl._vimNode
+        ? [vimEl._vimNode.id]
+        : [];
+  return ids.filter(clipTargetableId);
+}
+
+function vimToggleSelect() {
+  if (!vimEl || !vimEl._vimNode) return;
+  if (!clipTargetableId(vimEl._vimNode.id)) return;
+  var id = vimEl._vimNode.id;
+  if (vimSelected.has(id)) vimSelected.delete(id);
+  else vimSelected.add(id);
+  updateCursorVisuals();
+}
+
+function vimClearSelection() {
+  if (vimSelected.size === 0) return;
+  vimSelected.clear();
+  updateCursorVisuals();
+}
+
+function vimCancelClipboard() {
+  if (clipboard.mode == null && clipboard.ids.length === 0) return;
+  clipboard = { ids: [], mode: null };
+  updateCursorVisuals();
 }
 
 function vimYank() {
   var ids = vimGetTargetIds();
-  if (ids.length > 0) {
-    clipboard = { ids: ids, mode: "copy" };
-  }
-  vimSelected.clear();
+  if (ids.length === 0) return; // keep any pending clipboard untouched
+  clipboard = { ids: ids, mode: "copy" };
+  vimClearSelection();
   updateCursorVisuals();
 }
 
+// cut marks the items; nothing moves until they are pasted somewhere
 function vimCut() {
   var ids = vimGetTargetIds();
   if (ids.length === 0) return;
   clipboard = { ids: ids, mode: "cut" };
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i];
-    if (coords[id]) removeRow(coords[id].x, coords[id].y);
-  }
-  vimSelected.clear();
-  vimCursor.y = clamp(vimCursor.y - 1, 0, getVisibleLinks(vimCursor.x).length - 1);
+  vimClearSelection();
   updateCursorVisuals();
 }
 
-function vimDelete() {
-  if (!vimEl) return;
+// paste relative to the item under the cursor, inside whatever folder it
+// lives in; folders paste beside as siblings like any other item
+function vimPaste(below) {
+  if (clipboard.mode == null || clipboard.ids.length === 0) return;
+  pasteBatch(clipboard.mode, clipboard.ids.slice(0), below);
+}
 
-  var ids = vimGetTargetIds();
+// resolves the paste destination from the cursor position:
+//   {anchorId, below} - insert before/after that bookmark node
+//   {parentId}        - append to that folder
+function getPasteDestination(below) {
+  if (!(vimEl && vimEl._vimNode))
+    return Promise.resolve({ parentId: getDefaultParentId() });
+  var node = vimEl._vimNode;
+  if (node.id === "empty")
+    return Promise.resolve({
+      parentId: findParentFolderId(vimEl.parentNode) || getDefaultParentId(),
+    });
+  if (!clipTargetableId(node.id))
+    return Promise.resolve({ parentId: getDefaultParentId() });
+  return bmGet(node.id).then(function (results) {
+    if (!results || !results[0])
+      return { parentId: getDefaultParentId() };
+    return { anchorId: node.id, below: !!below };
+  });
+}
+
+async function pasteBatch(mode, ids, below) {
+  var dest = await getPasteDestination(below);
+
+  var parentId = null; // resolved destination folder (set once known)
+  var base = null; // copy mode: static insertion index, null = append
+
+  if (!dest.anchorId) {
+    parentId = dest.parentId;
+  } else if (mode !== "cut") {
+    // copy mode inserts fresh clones at static positions relative to the
+    // anchor; cut mode re-reads the live anchor before every move instead
+    var anc0 = await bmGet(dest.anchorId);
+    if (!anc0 || !anc0[0]) return;
+    parentId = anc0[0].parentId;
+    base = anc0[0].index + (below ? 1 : 0);
+  }
+
+  var par = parentId ? await bmGet(parentId) : null;
+  var len = par && par[0] && par[0].children ? par[0].children.length : 0;
+
+  var done = [];
+  for (var i = 0; i < ids.length; i++) {
+    if (mode === "cut") {
+      var src = await bmGet(ids[i]);
+      if (!src || !src[0]) continue;
+      var props;
+      if (dest.anchorId) {
+        // inserting directly above the live anchor stacks items in order;
+        // below the anchor needs the running offset to clear earlier moves
+        var anc = await bmGet(dest.anchorId);
+        if (!anc || !anc[0]) break;
+        props = {
+          parentId: anc[0].parentId,
+          index: below ? anc[0].index + 1 + i : anc[0].index,
+        };
+      } else {
+        props = { parentId: parentId, index: null };
+      }
+      if (!parentId) parentId = props.parentId;
+      var moved = await bmMove(ids[i], props);
+      if (!moved) continue;
+      done.push(moved.id);
+    } else {
+      if (!clipTargetableId(ids[i])) continue;
+      var created = await copyBookmarkSubtree(
+        ids[i],
+        parentId,
+        base == null ? null : Math.max(0, Math.min(base + i, len)),
+      );
+      if (!created) continue;
+      len++;
+      done.push(created.id);
+    }
+  }
+
+  clipboard = { ids: [], mode: null };
+  if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
+  else updateCursorVisuals();
+}
+
+// keeps the page layout grid in step with tree-level changes:
+// items pasted at top level show up at the cursor's spot, items pasted
+// inside a folder leave the top level
+function syncLayoutAfterPaste(ids, parentId, below) {
+  // flattened column: a lone root folder rendered as its own contents
+  // (single-folder column with "show top-level folders" off); pasted items
+  // become children of that folder, not stored grid entries
+  var flatX = -1;
+  if (!getConfig("show_root")) {
+    for (var x = 0; x < columns.length; x++) {
+      if (columns[x].length === 1 && columns[x][0] === parentId) {
+        flatX = x;
+        break;
+      }
+    }
+  }
+  if (flatX > -1) {
+    scheduleRestore(ids[0]);
+    saveColumns(); // triggers the re-render
+  } else if (vimEl && vimEl._vimNode && coords && coords[vimEl._vimNode.id]) {
+    // top level (stored in the layout grid): land the cursor on the first pasted item once rendered
+    scheduleRestore(ids[0]);
+    var pos = coords[vimEl._vimNode.id];
+    placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
+  } else {
+    // nested destination: items leave the page grid; the cursor simply
+    // stays where it is
+    removeFromLayout(ids);
+    saveColumns(); // triggers the re-render
+  }
+}
+
+// true when the id is a stored grid entry
+function inColumns(id) {
+  for (var x = 0; x < columns.length; x++) {
+    if (columns[x].indexOf(id) > -1) return true;
+  }
+  return false;
+}
+
+// mouse support (#2): drop a bookmark onto a folder header to move it there
+function folderMoveDrop(dragIds, folderNodeId) {
+  if (!folderNodeId || !isRealBookmarkId(folderNodeId)) return;
+  var ids = (dragIds || []).filter(function (id) {
+    return clipTargetableId(id) && id !== folderNodeId;
+  });
   if (ids.length === 0) return;
-  clipboard = { ids: ids, mode: "delete" };
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i];
-    if (coords[id]) removeRow(coords[id].x, coords[id].y);
-  }
-  vimSelected.clear();
-  vimCursor.y = clamp(vimCursor.y - 1, 0, getVisibleLinks(vimCursor.x).length - 1);
-  updateCursorVisuals();
+  var movedIds = [];
+  var next = function (i) {
+    if (i >= ids.length) {
+      // only prune layout entries that actually moved - failed moves (e.g.
+      // dropping a folder into its own descendant) must stay on the page
+      if (movedIds.length > 0) {
+        removeFromLayout(movedIds);
+        saveColumns(); // triggers the re-render
+      }
+      return;
+    }
+    bmMove(ids[i], { parentId: folderNodeId }).then(function (moved) {
+      if (moved) movedIds.push(ids[i]);
+      next(i + 1);
+    });
+  };
+  next(0);
 }
 
-async function vimPasteAt(destY) {
-  if (clipboard.ids.length === 0) return;
-  var destX = vimCursor.x;
-  if (clipboard.mode === "cut") {
-    for (var i = 0; i < clipboard.ids.length; i++) {
-      addRow(clipboard.ids[i], destX, destY + i);
-    }
-    return;
-  }
-  for (var i = 0; i < clipboard.ids.length; i++) {
-    var id = clipboard.ids[i];
-    var added = false;
-    if (/^\d+$/.test(id)) {
-      try {
-        var results = await new Promise(function (resolve) {
-          chrome.bookmarks.getSubTree(id, function (res) {
-            if (chrome.runtime.lastError) {
-              console.warn(chrome.runtime.lastError);
-              resolve(null);
-            } else resolve(res);
-          });
+function bmMove(id, dest) {
+  return new Promise(function (resolve) {
+    chrome.bookmarks.move(id, dest, function (moved) {
+      if (chrome.runtime.lastError) {
+        console.warn("move failed:", chrome.runtime.lastError.message);
+        resolve(null);
+      } else resolve(moved);
+    });
+  });
+}
+
+// deep-copies a bookmark subtree, resolves to the new root node (or null);
+// index optionally positions the clone within destParentId
+function copyBookmarkSubtree(sourceId, destParentId, index) {
+  function cloneNode(node, parentId, position) {
+    var props = { parentId: parentId, title: node.title };
+    if (node.url) props.url = node.url;
+    if (position != null) props.index = position;
+    return bmCreate(props).then(function (created) {
+      if (!created || !node.children) return created;
+      var chain = Promise.resolve(null);
+      node.children.forEach(function (child) {
+        chain = chain.then(function () {
+          return cloneNode(child, created.id);
         });
-        if (results && results[0]) {
-          var parentId = results[0].parentId;
-          if (!parentId && columns[0] && columns[0].length > 0) {
-            parentId = columns[0][0];
-          }
-          if (parentId) {
-            var newNode = await copyBookmarkSubtree(id, parentId);
-            if (newNode && newNode.id) {
-              addRow(newNode.id, destX, destY + i);
-              added = true;
-            }
-          }
-        }
-      } catch (e) { }
-    }
-    if (!added) {
-      addRow(id, destX, destY + i);
-    }
+      });
+      return chain.then(function () {
+        return created;
+      });
+    });
   }
+  return bmGetSubTree(sourceId).then(
+    function (results) {
+      if (!results || !results[0]) return null;
+      return cloneNode(results[0], destParentId, index);
+    },
+    function () {
+      return null;
+    },
+  );
 }
 
-function vimPaste(asColumn) {
-  if (asColumn) return addColumn(clipboard.ids, vimCursor.x + 1);
-  return vimPasteAt(getCursorRow(vimCursor.x));
-}
+// ---------------------------------------------------------------------------
+// theme picker
+// ---------------------------------------------------------------------------
 
-async function vimPasteAbove() {
-  return vimPasteAt(getCursorRow(vimCursor.x));
-}
-
-// Theme picker
 function vimShowThemePicker() {
   var items = [];
   var current = getConfig("theme");
@@ -555,6 +820,7 @@ function vimShowThemePicker() {
     (function (name) {
       items.push({
         label: (name === current ? "\u25cf " : "  ") + name,
+        selected: name === current,
         action: function () {
           setConfig("theme", name);
         },
@@ -569,118 +835,119 @@ function vimShowThemePicker() {
     x = rect.left + window.scrollX;
     y = rect.bottom + window.scrollY;
   }
-  renderMenu(items, x, y);
+  renderMenu(items, x, y, "Theme picker");
 }
 
-// Key handler
+// ---------------------------------------------------------------------------
+// key bindings
+// ---------------------------------------------------------------------------
+
 document.addEventListener("keydown", function (event) {
-  var tag = event.target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  if (document.querySelector(".menu") || document.querySelector(".vim-modal-backdrop"))
-    return;
-
-  var key = event.key;
-
-  if (event.ctrlKey) {
+  // options panel: Esc closes it, other keys are ignored while it is open
+  // (checked before the input guard so Esc works from inside panel controls)
+  if (document.getElementById("options").style.display === "block") {
+    if (event.key === "Escape") {
+      showOptions(false);
+      event.preventDefault();
+    }
     return;
   }
 
-  switch (key) {
+  var tag = event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+  // popup menus and modals handle their own keys
+  if (
+    document.querySelector(".menu") ||
+    document.querySelector(".vim-modal-backdrop")
+  )
+    return;
+
+  if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+  var handled = true;
+  switch (event.key) {
     case "ArrowLeft":
     case "h":
       moveCursor(-1, 0);
-      event.preventDefault();
       break;
     case "ArrowRight":
     case "l":
       moveCursor(1, 0);
-      event.preventDefault();
       break;
-    case 'ArrowDown':
+    case "ArrowDown":
     case "j":
       moveCursor(0, 1);
-      event.preventDefault();
       break;
-    case 'ArrowUp':
+    case "ArrowUp":
     case "k":
       moveCursor(0, -1);
-      event.preventDefault();
       break;
     case "Enter":
     case "o":
       vimActivate();
-      event.preventDefault();
       break;
     case "O":
       vimOpenFolder();
-      event.preventDefault();
       break;
-    case 'n':
-      createBookmark();
-      event.preventDefault();
+    case "n":
+      createNodeDialog(false);
       break;
-    case 'N':
-      createFolder();
-      event.preventDefault();
+    case "N":
+      createNodeDialog(true);
       break;
-    case 'e':
-      event.preventDefault();
-      updateNode();
+    case "e":
+      editNodeDialog();
       break;
     case "d":
-      event.preventDefault();
-      deleteNode();
+      vimDelete();
       break;
-
-    // TODO: Additional Features, review and implement
-
-    // case "v":
-    //   if (vimEl && vimEl._vimNode) {
-    //     var id = vimEl._vimNode.id;
-    //     if (vimSelected.has(id)) vimSelected.delete(id);
-    //     else vimSelected.add(id);
-    //     updateCursorVisuals();
-    //   }
-    //   event.preventDefault();
-    //   break;
-    // case "V":
-    //   vimSelected.clear();
-    //   updateCursorVisuals();
-    //   event.preventDefault();
-    //   break;
-    // case "y":
-    //   vimYank();
-    //   event.preventDefault();
-    //   break;
-    // case "x":
-    //   vimCut();
-    //   event.preventDefault();
-    //   break;
-    // case "C":
-    //   removeColumn(vimCursor.x);
-    //   break;
-    // case "p":
-    //   vimPaste(false);
-    //   event.preventDefault();
-    //   break;
-    // case "P":
-    //   vimPasteAbove();
-    //   event.preventDefault();
-    //   break;
-    // case "T":
-    //   vimShowThemePicker();
-    //   event.preventDefault();
-    //   break;
-    // case "Escape":
-    //   vimSelected.clear();
-    //   updateCursorVisuals();
-    //   break;
+    case "v":
+      vimToggleSelect();
+      break;
+    case "V":
+      vimClearSelection();
+      break;
+    case "y":
+      vimYank();
+      break;
+    case "x":
+      vimCut();
+      break;
+    case "p":
+      vimPaste(true); // below / after
+      break;
+    case "P":
+      vimPaste(false); // above / before
+      break;
+    case "T":
+      vimShowThemePicker();
+      break;
+    case "/":
+      showOptions(true);
+      break;
+    case "Escape":
+      vimClearSelection();
+      vimCancelClipboard();
+      break;
+    default:
+      handled = false;
   }
+  if (handled) event.preventDefault();
 });
 
-// Re-render hook
+// ---------------------------------------------------------------------------
+// re-render hook
+// ---------------------------------------------------------------------------
+
+var vimRafPending = false;
 var vimObserver = new MutationObserver(function () {
-  resolveCursor();
+  if (vimRafPending) return;
+  vimRafPending = true;
+  requestAnimationFrame(function () {
+    vimRafPending = false;
+    resolveCursor();
+  });
 });
 
 function vimInit() {

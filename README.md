@@ -5,7 +5,9 @@
 - [OhMyNewTabPage](#ohmynewtabpage)
   - [Features & Roadmap](#features-roadmap)
   - [Themes](#themes)
+    - [Example](#example)
   - [Usage & Navigation](#usage-navigation)
+  - [Installation](#installation)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -18,6 +20,9 @@ A lightning-fast, keyboard-centric new tab page for power users. This project is
 - [x] **Vim Navigation** — Navigate your bookmarks and links seamlessly using intuitive keyboard shortcuts.
 - [x] **Theme Picker** — Switch instantly between popular aesthetic themes (Nord, Catppuccin, Rosé Pine, Tokyo Night, and more).
 - [x] **Cut, Copy & Paste for Bookmarks** — Easily rearrange and reorganize your bookmarked links directly from the keyboard or mouse.
+- [ ] **Automatic Theme Syncing** — Context-aware theme option that applies colors based on browser's color palette.
+- [ ] **Built-in Fuzzy Finder** — Quickly search and filter through all your bookmarks in real time.
+- [ ] **Custom Theme Support** — Create, customize, and apply your own custom color palettes.
 
 ## Themes
 
@@ -97,6 +102,18 @@ Notes:
   inside that folder — the top and bottom edges of the header keep the
   regular reorder behavior.
 - _The options menu navigation is a work in progress._
+
+## Installation
+
+Since the extension isn't on the Chrome Web Store yet, you can easily load the latest release manually:
+
+1. **Download the Release:** Head to the [Releases](https://github.com/AlyKazani04/OhMyNewTabPage/releases) page and download the latest `.zip` package.
+2. **Unzip the File:** Extract the contents of the downloaded `.zip` file into a folder on your machine.
+3. **Open Extensions Page:** Open Chrome (or any Chromium browser) and navigate to `chrome://extensions/`.
+4. **Enable Developer Mode:** Toggle the **Developer mode** switch in the top right corner.
+5. **Load Unpacked:** Click the **Load unpacked** button in the top left corner and select the extracted folder.
+
+_Done! Open a new tab to see **OhMyNewTabPage** in action._
 
 ## Contributing
 

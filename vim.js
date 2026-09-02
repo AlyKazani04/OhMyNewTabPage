@@ -5,16 +5,11 @@
 // Depends on globals from newtab.js (loaded first):
 //   columns, root, special, toggle, saveColumns, renderColumns,
 //   getConfig, setConfig, themes, showOptions, renderMenu
+// Now uses core modules for vim state and Chrome APIs via shim globals
 
-// ---------------------------------------------------------------------------
-// state
-// ---------------------------------------------------------------------------
-
-var vimCursor = { x: 0, y: 0 };
-var vimEl = null;
-var vimSelected = new Set();
-var clipboard = { ids: [], mode: null };
-var vimPendingRestore = null;
+// Vim state is now in core/state.js (exposed via shim as window.state, window.getters, window.mutations):
+// state.vimCursor, state.vimEl, state.vimSelected, state.clipboard, state.vimPendingRestore
+// Access via state.* or getters.*; mutate via mutations.*
 
 // ---------------------------------------------------------------------------
 // traversal and cursor
@@ -63,10 +58,10 @@ function collectLinks(container, links) {
 
 // top-level row (within its column) of the item under the cursor
 function getCursorTopLevelRow() {
-  var fallback = columns[vimCursor.x] ? columns[vimCursor.x].length : 0;
-  if (!vimEl) return fallback;
+  var fallback = columns[state.vimCursor.x] ? columns[state.vimCursor.x].length : 0;
+  if (!state.vimEl) return fallback;
   // climb to the <ul> that sits directly under the column
-  var ul = vimEl.parentNode;
+  var ul = state.vimEl.parentNode;
   while (
     ul &&
     !(
@@ -78,7 +73,7 @@ function getCursorTopLevelRow() {
     ul = ul.parentNode;
   if (!ul) return fallback;
   // descend from the anchor to the top-level <li>
-  var li = vimEl;
+  var li = state.vimEl;
   while (li && li.parentNode !== ul) li = li.parentNode;
   if (!li || li.tagName !== "LI") return fallback;
   var row = 0;
@@ -91,27 +86,27 @@ function getCursorTopLevelRow() {
 }
 
 function updateCursorVisuals() {
-  if (vimEl) vimEl.classList.remove("vim-cursor");
-  vimEl = null;
+  if (state.vimEl) state.vimEl.classList.remove("vim-cursor");
+  mutations.setVimEl(null);
 
-  var links = getVisibleLinks(vimCursor.x);
-  if (vimCursor.y >= 0 && vimCursor.y < links.length) {
-    vimEl = links[vimCursor.y];
-    vimEl.classList.add("vim-cursor");
-    vimEl.scrollIntoView({ block: "nearest" });
+  var links = getVisibleLinks(state.vimCursor.x);
+  if (state.vimCursor.y >= 0 && state.vimCursor.y < links.length) {
+    mutations.setVimEl(links[state.vimCursor.y]);
+    state.vimEl.classList.add("vim-cursor");
+    state.vimEl.scrollIntoView({ block: "nearest" });
   }
 
-  var cutting = clipboard.mode === "cut";
+  var cutting = state.clipboard.mode === "cut";
   var allLinks = document.querySelectorAll("#main a");
   for (var i = 0; i < allLinks.length; i++) {
     var link = allLinks[i];
     var id = link._vimNode && link._vimNode.id;
-    if (id && vimSelected.has(id)) {
+    if (id && state.vimSelected.has(id)) {
       link.classList.add("vim-selected");
     } else {
       link.classList.remove("vim-selected");
     }
-    if (cutting && id && clipboard.ids.indexOf(id) > -1) {
+    if (cutting && id && state.clipboard.ids.indexOf(id) > -1) {
       link.classList.add("vim-cut");
     } else {
       link.classList.remove("vim-cut");
@@ -121,33 +116,33 @@ function updateCursorVisuals() {
 
 function resolveCursor() {
   if (!columns || columns.length === 0) return;
-  vimCursor.x = clamp(vimCursor.x, 0, columns.length - 1);
-  if (vimPendingRestore != null) restoreCursor(vimPendingRestore);
-  var links = getVisibleLinks(vimCursor.x);
-  vimCursor.y = clamp(vimCursor.y, 0, Math.max(0, links.length - 1));
+  mutations.setVimCursor(clamp(state.vimCursor.x, 0, columns.length - 1), state.vimCursor.y);
+  if (state.vimPendingRestore != null) restoreCursor(state.vimPendingRestore);
+  var links = getVisibleLinks(state.vimCursor.x);
+  mutations.setVimCursor(state.vimCursor.x, clamp(state.vimCursor.y, 0, Math.max(0, links.length - 1)));
   updateCursorVisuals();
 }
 
 // put the cursor back on node id after a re-render (retried until rendered)
 function scheduleRestore(id) {
-  vimPendingRestore = id;
+  mutations.setVimPendingRestore(id);
   setTimeout(function () {
-    if (vimPendingRestore === id) vimPendingRestore = null;
+    if (state.vimPendingRestore === id) mutations.clearVimPendingRestore();
   }, 2000);
 }
 
 function restoreCursor(id) {
   for (var x = 0; x < columns.length; x++) {
     if (columns[x].indexOf(id) === -1) continue;
-    vimCursor.x = x;
+    mutations.setVimCursor(x, state.vimCursor.y);
     var links = getVisibleLinks(x);
     for (var i = 0; i < links.length; i++) {
       if (links[i]._vimNode && links[i]._vimNode.id === id) {
-        vimCursor.y = i;
+        mutations.setVimCursor(x, i);
         break;
       }
     }
-    vimPendingRestore = null;
+    mutations.clearVimPendingRestore();
     return;
   }
   // fallback: the id may live inside a rendered folder rather than the
@@ -156,9 +151,8 @@ function restoreCursor(id) {
     var links = getVisibleLinks(x);
     for (var i = 0; i < links.length; i++) {
       if (links[i]._vimNode && links[i]._vimNode.id === id) {
-        vimCursor.x = x;
-        vimCursor.y = i;
-        vimPendingRestore = null;
+        mutations.setVimCursor(x, i);
+        mutations.clearVimPendingRestore();
         return;
       }
     }
@@ -168,13 +162,13 @@ function restoreCursor(id) {
 function moveCursor(dx, dy) {
   if (!columns || columns.length === 0) return;
   if (dx !== 0) {
-    vimCursor.x = clamp(vimCursor.x + dx, 0, columns.length - 1);
-    var links = getVisibleLinks(vimCursor.x);
-    vimCursor.y = clamp(vimCursor.y, 0, Math.max(0, links.length - 1));
+    mutations.setVimCursor(clamp(state.vimCursor.x + dx, 0, columns.length - 1), state.vimCursor.y);
+    var links = getVisibleLinks(state.vimCursor.x);
+    mutations.setVimCursor(state.vimCursor.x, clamp(state.vimCursor.y, 0, Math.max(0, links.length - 1)));
   }
   if (dy !== 0) {
-    var curLinks = getVisibleLinks(vimCursor.x);
-    vimCursor.y = clamp(vimCursor.y + dy, 0, Math.max(0, curLinks.length - 1));
+    var curLinks = getVisibleLinks(state.vimCursor.x);
+    mutations.setVimCursor(state.vimCursor.x, clamp(state.vimCursor.y + dy, 0, Math.max(0, curLinks.length - 1)));
   }
   updateCursorVisuals();
 }
@@ -184,20 +178,20 @@ function moveCursor(dx, dy) {
 // ---------------------------------------------------------------------------
 
 function vimActivate() {
-  if (!vimEl) return;
-  var isFolder = vimEl.classList.contains("folder");
+  if (!state.vimEl) return;
+  var isFolder = state.vimEl.classList.contains("folder");
   if (isFolder) {
-    var node = vimEl._vimNode;
-    if (node) toggle(node, vimEl);
+    var node = state.vimEl._vimNode;
+    if (node) toggle(node, state.vimEl);
   } else {
-    vimEl.dispatchEvent(new MouseEvent("click"));
+    state.vimEl.dispatchEvent(new MouseEvent("click"));
   }
 }
 
 function vimOpenFolder() {
-  if (!vimEl || !vimEl.classList.contains("folder")) return;
-  var node = vimEl._vimNode;
-  if (node) toggle(node, vimEl);
+  if (!state.vimEl || !state.vimEl.classList.contains("folder")) return;
+  var node = state.vimEl._vimNode;
+  if (node) toggle(node, state.vimEl);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,42 +277,8 @@ function showModal(options) {
 }
 
 // ---------------------------------------------------------------------------
-// bookmark api helpers
+// bookmark api helpers (now from core/chrome-api.js)
 // ---------------------------------------------------------------------------
-
-function bmGet(id) {
-  return new Promise(function (resolve) {
-    chrome.bookmarks.get(id, function (results) {
-      if (chrome.runtime.lastError) {
-        console.warn(chrome.runtime.lastError.message);
-        resolve(null);
-      } else resolve(results);
-    });
-  });
-}
-
-// like bmGet, but includes the children of the requested node
-function bmGetSubTree(id) {
-  return new Promise(function (resolve) {
-    chrome.bookmarks.getSubTree(id, function (results) {
-      if (chrome.runtime.lastError) {
-        console.warn(chrome.runtime.lastError.message);
-        resolve(null);
-      } else resolve(results);
-    });
-  });
-}
-
-function bmCreate(props) {
-  return new Promise(function (resolve) {
-    chrome.bookmarks.create(props, function (result) {
-      if (chrome.runtime.lastError) {
-        console.warn("bookmark create failed:", chrome.runtime.lastError.message);
-        resolve(null);
-      } else resolve(result);
-    });
-  });
-}
 
 function isRealBookmarkId(id) {
   return /^\d+$/.test(String(id));
@@ -360,10 +320,10 @@ function findParentFolderId(li) {
 // where a newly created item should go: parent folder + optional anchor node
 function getInsertionContext() {
   var context = { parentId: getDefaultParentId(), afterId: null };
-  if (!(vimEl && vimEl._vimNode)) return context;
-  var parentId = findParentFolderId(vimEl.parentNode);
+  if (!(state.vimEl && state.vimEl._vimNode)) return context;
+  var parentId = findParentFolderId(state.vimEl.parentNode);
   if (parentId) context.parentId = parentId;
-  if (vimEl._vimNode.id !== "empty") context.afterId = vimEl._vimNode.id;
+  if (state.vimEl._vimNode.id !== "empty") context.afterId = state.vimEl._vimNode.id;
   return context;
 }
 
@@ -401,10 +361,10 @@ function createNodeDialog(isFolder) {
 function createBookmarkAt(props, afterId) {
   var finish = function (index) {
     if (index != null) props.index = index;
-    chrome.bookmarks.create(props, function (result) {
-      if (chrome.runtime.lastError)
-        console.warn("create failed:", chrome.runtime.lastError.message);
-      else if (result) scheduleRestore(result.id);
+    bmCreate(props).then(function (result) {
+      if (!result) {
+        console.warn("create failed");
+      } else if (result) scheduleRestore(result.id);
       renderColumns();
     });
   };
@@ -425,10 +385,10 @@ function createBookmarkAt(props, afterId) {
 }
 
 function editNodeDialog() {
-  if (!vimEl || !vimEl._vimNode) return;
-  var node = vimEl._vimNode;
+  if (!state.vimEl || !state.vimEl._vimNode) return;
+  var node = state.vimEl._vimNode;
   if (!isRealBookmarkId(node.id)) return; // virtual nodes are not editable
-  var isFolder = vimEl.classList.contains("folder");
+  var isFolder = state.vimEl.classList.contains("folder");
   var fields = isFolder
     ? [{ label: "Name", placeholder: "Folder name", value: node.title }]
     : [
@@ -451,7 +411,7 @@ function editNodeDialog() {
         props.title = values[0].trim() || url;
         props.url = url;
       }
-      chrome.bookmarks.update(node.id, props, function () {
+      bmUpdate(node.id, props).then(function () {
         if (chrome.runtime.lastError)
           console.warn("edit failed:", chrome.runtime.lastError.message);
         else scheduleRestore(node.id);
@@ -467,12 +427,12 @@ function editNodeDialog() {
 // ---------------------------------------------------------------------------
 
 function vimDelete() {
-  if (!vimEl || !vimEl._vimNode) return;
+  if (!state.vimEl || !state.vimEl._vimNode) return;
   var ids = vimGetTargetIds(); // already filtered to real bookmarks
   if (ids.length === 0) return;
   var message;
-  if (vimSelected.size === 0) {
-    var node = vimEl._vimNode;
+  if (state.vimSelected.size === 0) {
+    var node = state.vimEl._vimNode;
     message = 'Delete "' + (node.title || node.url || "this item") + '"?';
   } else {
     message = "Delete " + ids.length + " selected item(s)?";
@@ -494,7 +454,7 @@ function deleteBookmarksByIds(ids) {
       // prune layout entries for deleted top-level items instead of letting
       // the renderer discover them missing
       var topLevel = ids.filter(function (id) {
-        return coords[id];
+        return state.coords[id];
       });
       if (topLevel.length > 0) {
         removeFromLayout(topLevel);
@@ -514,8 +474,8 @@ function deleteBookmarksByIds(ids) {
           console.warn("delete failed:", chrome.runtime.lastError.message);
         next(i + 1);
       };
-      if (results[0].url) chrome.bookmarks.remove(ids[i], done);
-      else chrome.bookmarks.removeTree(ids[i], done);
+      if (results[0].url) bmRemove(ids[i]).then(done);
+      else bmRemoveTree(ids[i]).then(done);
     });
   };
   next(0);
@@ -567,39 +527,39 @@ function clipTargetableId(id) {
 
 function vimGetTargetIds() {
   var ids =
-    vimSelected.size > 0
-      ? Array.from(vimSelected)
-      : vimEl && vimEl._vimNode
-        ? [vimEl._vimNode.id]
+    state.vimSelected.size > 0
+      ? Array.from(state.vimSelected)
+      : state.vimEl && state.vimEl._vimNode
+        ? [state.vimEl._vimNode.id]
         : [];
   return ids.filter(clipTargetableId);
 }
 
 function vimToggleSelect() {
-  if (!vimEl || !vimEl._vimNode) return;
-  if (!clipTargetableId(vimEl._vimNode.id)) return;
-  var id = vimEl._vimNode.id;
-  if (vimSelected.has(id)) vimSelected.delete(id);
-  else vimSelected.add(id);
+  if (!state.vimEl || !state.vimEl._vimNode) return;
+  if (!clipTargetableId(state.vimEl._vimNode.id)) return;
+  var id = state.vimEl._vimNode.id;
+  if (state.vimSelected.has(id)) mutations.removeVimSelected(id);
+  else mutations.addVimSelected(id);
   updateCursorVisuals();
 }
 
 function vimClearSelection() {
-  if (vimSelected.size === 0) return;
-  vimSelected.clear();
+  if (state.vimSelected.size === 0) return;
+  mutations.clearVimSelected();
   updateCursorVisuals();
 }
 
 function vimCancelClipboard() {
-  if (clipboard.mode == null && clipboard.ids.length === 0) return;
-  clipboard = { ids: [], mode: null };
+  if (state.clipboard.mode == null && state.clipboard.ids.length === 0) return;
+  mutations.clearClipboard();
   updateCursorVisuals();
 }
 
 function vimYank() {
   var ids = vimGetTargetIds();
   if (ids.length === 0) return; // keep any pending clipboard untouched
-  clipboard = { ids: ids, mode: "copy" };
+  mutations.setClipboard(ids, "copy");
   vimClearSelection();
   updateCursorVisuals();
 }
@@ -608,7 +568,7 @@ function vimYank() {
 function vimCut() {
   var ids = vimGetTargetIds();
   if (ids.length === 0) return;
-  clipboard = { ids: ids, mode: "cut" };
+  mutations.setClipboard(ids, "cut");
   vimClearSelection();
   updateCursorVisuals();
 }
@@ -616,20 +576,20 @@ function vimCut() {
 // paste relative to the item under the cursor, inside whatever folder it
 // lives in; folders paste beside as siblings like any other item
 function vimPaste(below) {
-  if (clipboard.mode == null || clipboard.ids.length === 0) return;
-  pasteBatch(clipboard.mode, clipboard.ids.slice(0), below);
+  if (state.clipboard.mode == null || state.clipboard.ids.length === 0) return;
+  pasteBatch(state.clipboard.mode, state.clipboard.ids.slice(0), below);
 }
 
 // resolves the paste destination from the cursor position:
 //   {anchorId, below} - insert before/after that bookmark node
 //   {parentId}        - append to that folder
 function getPasteDestination(below) {
-  if (!(vimEl && vimEl._vimNode))
+  if (!(state.vimEl && state.vimEl._vimNode))
     return Promise.resolve({ parentId: getDefaultParentId() });
-  var node = vimEl._vimNode;
+  var node = state.vimEl._vimNode;
   if (node.id === "empty")
     return Promise.resolve({
-      parentId: findParentFolderId(vimEl.parentNode) || getDefaultParentId(),
+      parentId: findParentFolderId(state.vimEl.parentNode) || getDefaultParentId(),
     });
   if (!clipTargetableId(node.id))
     return Promise.resolve({ parentId: getDefaultParentId() });
@@ -695,7 +655,7 @@ async function pasteBatch(mode, ids, below) {
     }
   }
 
-  clipboard = { ids: [], mode: null };
+  mutations.clearClipboard();
   if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
   else updateCursorVisuals();
 }
@@ -719,10 +679,10 @@ function syncLayoutAfterPaste(ids, parentId, below) {
   if (flatX > -1) {
     scheduleRestore(ids[0]);
     saveColumns(); // triggers the re-render
-  } else if (vimEl && vimEl._vimNode && coords && coords[vimEl._vimNode.id]) {
+  } else if (state.vimEl && state.vimEl._vimNode && state.coords && state.coords[state.vimEl._vimNode.id]) {
     // top level (stored in the layout grid): land the cursor on the first pasted item once rendered
     scheduleRestore(ids[0]);
-    var pos = coords[vimEl._vimNode.id];
+    var pos = state.coords[state.vimEl._vimNode.id];
     placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
   } else {
     // nested destination: items leave the page grid; the cursor simply
@@ -764,17 +724,6 @@ function folderMoveDrop(dragIds, folderNodeId) {
     });
   };
   next(0);
-}
-
-function bmMove(id, dest) {
-  return new Promise(function (resolve) {
-    chrome.bookmarks.move(id, dest, function (moved) {
-      if (chrome.runtime.lastError) {
-        console.warn("move failed:", chrome.runtime.lastError.message);
-        resolve(null);
-      } else resolve(moved);
-    });
-  });
 }
 
 // deep-copies a bookmark subtree, resolves to the new root node (or null);
@@ -830,8 +779,8 @@ function vimShowThemePicker() {
 
   var x = 100,
     y = 100;
-  if (vimEl) {
-    var rect = vimEl.getBoundingClientRect();
+  if (state.vimEl) {
+    var rect = state.vimEl.getBoundingClientRect();
     x = rect.left + window.scrollX;
     y = rect.bottom + window.scrollY;
   }

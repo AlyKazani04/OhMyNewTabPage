@@ -1,0 +1,26 @@
+{
+  "name": "oh-my-new-tab-page",
+  "version": "1.0.1",
+  "homepage": "https://github.com/AlyKazani04/OhMyNewTabPage#readme",
+  "bugs": {
+    "url": "https://github.com/AlyKazani04/OhMyNewTabPage/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlyKazani04/OhMyNewTabPage.git"
+  },
+  "license": "MIT",
+  "author": "AlyKazani04",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "esbuild src/entry.js --bundle --outfile=temp_output.js --format=iife --global-name=OMNTP",
+    "dev": "npm run build -- --watch",
+    "test": "echo 'Manual: Load unpacked extension in Chrome'"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

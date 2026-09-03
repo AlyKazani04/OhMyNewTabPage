@@ -3,6 +3,8 @@ import * as core from './core/index.js';
 import * as config from './config/index.js';
 import * as chromeApi from './core/chrome-api.js';
 import * as bookmarks from './bookmarks/index.js';
+import * as render from './render/index.js';
+import * as interaction from './interaction/index.js';
 import { emit, Events } from './core/events.js';
 import { state, mutations } from './core/state.js';
 
@@ -31,21 +33,22 @@ window.bmRemoveTree = chromeApi.bmRemoveTree;
 
 // Bookmarks module functions
 window.saveColumns = bookmarks.saveColumns;
-window.renderColumns = () => emit(Events.RENDER_REQUESTED);  // Will be overridden by render module
-window.toggle = (node, anchor) => emit('folder:toggle', { node, anchor });  // Will be overridden by render module
+window.renderColumns = render.renderColumns;
+window.toggle = render.toggle;
 window.getConfig = config.get;
 window.setConfig = config.set;
 window.themes = config.THEMES;
 window.showOptions = config.showOptions;
-window.renderMenu = (items, x, y, label) => emit('menu:render', { items, x, y, label });  // Will be overridden by interaction module
+window.renderMenu = interaction.renderMenu;
 window.getChildrenFunction = bookmarks.getChildrenFunction;
 window.SPECIAL = core.state.special;
 window.clipTargetableId = bookmarks.clipTargetableId;
 window.getCoords = core.getters.getCoords;
+window.renderAll = render.renderAll;
 
 // Config legacy references
 window.config = config.DEFAULTS;
-window.theme = {};  // populated by storage.loadAll()
+window.theme = {};
 window.loadSettings = config.loadAll;
 window.initSettings = config.initSettings;
 window.initConfig = config.initConfig;
@@ -55,33 +58,28 @@ window.getStyle = config.generateCSS;
 window.scale = config.scale;
 
 // Wire up cross-module dependencies
-// tree.js needs removeRow from layout.js
 bookmarks.setRemoveRow(bookmarks.removeRow);
-// special-nodes.js needs getChildrenFunction from tree.js and renderAll from render module
 bookmarks.setGetChildrenFunction(bookmarks.getChildrenFunction);
-// layout.js needs scheduleRestore from vim (will be set when vim module loads)
-// layout.js needs renderColumns (will be set when render module loads)
+bookmarks.setRenderAll(render.renderAll);
+bookmarks.setScheduleRestore(bookmarks.scheduleRestore);
+render.setGetChildrenFunction(bookmarks.getChildrenFunction);
+render.setGetConfig(config.get);
+render.setAddFolderHandlers(interaction.addFolderHandlers);
+render.setEnableDragFolder(interaction.enableDragFolder);
+render.setAddColumnHandlers(interaction.addColumnHandlers);
+render.setEnableDragColumn(interaction.enableDragColumn);
+render.setEnableDragDrop(interaction.enableDragDrop);
+interaction.setGetChildrenFunction(bookmarks.getChildrenFunction);
+interaction.setOpenLink(render.openLink);
+interaction.setShowOptions(config.showOptions);
 
-// Initialize config on load
+// Initialize
 config.loadAll();
+interaction.initKeyboard();
 
-// Listen for render requests and trigger renderColumns
+// Event listeners
 import { on } from './core/events.js';
-on(Events.RENDER_REQUESTED, () => {
-  if (window.renderColumns) window.renderColumns();
-});
-
-// Listen for folder toggle
-on('folder:toggle', ({ node, anchor }) => {
-  if (window.toggle) window.toggle(node, anchor);
-});
-
-// Listen for menu render
-on('menu:render', ({ items, x, y, label }) => {
-  if (window.renderMenu) window.renderMenu(items, x, y, label);
-});
-
-// Listen for bookmarks:getChildrenFunction
-on('bookmarks:getChildrenFunction', (node) => {
-  if (window.getChildrenFunction) window.getChildrenFunction(node);
-});
+on(Events.RENDER_REQUESTED, () => { if (window.renderColumns) window.renderColumns(); });
+on('folder:toggle', ({ node, anchor }) => { if (window.toggle) window.toggle(node, anchor); });
+on('menu:render', ({ items, x, y, label }) => { if (window.renderMenu) window.renderMenu(items, x, y, label); });
+on('bookmarks:getChildrenFunction', (node) => { if (window.getChildrenFunction) window.getChildrenFunction(node); });

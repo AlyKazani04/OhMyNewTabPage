@@ -2,9 +2,13 @@ import './core/index.js';
 import './config/index.js';
 import './bookmarks/index.js';
 import './render/index.js';
+import './interaction/index.js';
+import './vim/index.js';
 
-// Future phases will import their barrels here
-// import './interaction/index.js';
-// import './vim/index.js';
+// Initialize the application
+import { loadAll } from './config/storage.js';
+import { initKeyboard } from './interaction/keyboard.js';
 
-import './shim.js';  // Temporary bridge
+// Initialize config and keyboard
+loadAll();
+initKeyboard();

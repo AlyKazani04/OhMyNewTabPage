@@ -1,4 +1,4 @@
-import { get, set, loadAll } from './storage.js';
+import { get, set, loadAll, currentTheme } from './storage.js';
 import { DEFAULTS, getThemeNames } from './schema.js';
 import { emit, Events } from '../core/events.js';
 import * as chromeApi from '../core/chrome-api.js';

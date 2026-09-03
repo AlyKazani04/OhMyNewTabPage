@@ -13,17 +13,6 @@ var OMNTP = (() => {
     clipboard: { ids: [], mode: null },
     vimPendingRestore: null
   };
-  var getters = {
-    getColumnCount: () => state.columns.length,
-    getColumn: (x) => state.columns[x],
-    getRootId: (x) => state.root[x],
-    getCoords: (id) => state.coords[id],
-    isSpecial: (id) => id in state.special,
-    getSpecialNode: (id) => state.special[id],
-    getVimCursor: () => ({ ...state.vimCursor }),
-    getVimSelected: () => [...state.vimSelected],
-    getClipboard: () => ({ ...state.clipboard })
-  };
   var mutations = {
     setColumns: (cols) => {
       state.columns = cols;
@@ -175,17 +164,14 @@ var OMNTP = (() => {
     if (typeof def === "boolean") return Boolean(value);
     return String(value);
   }
-  function getThemeNames() {
-    return Object.keys(THEMES);
-  }
 
   // src/config/storage.js
   var PREFIX = "options.";
-  var currentTheme2 = {};
+  var currentTheme = {};
   function get(key) {
     const stored = localStorage.getItem(PREFIX + key);
     if (stored != null) return validate(key, stored);
-    return currentTheme2.hasOwnProperty(key) ? currentTheme2[key] : DEFAULTS2[key];
+    return currentTheme.hasOwnProperty(key) ? currentTheme[key] : DEFAULTS2[key];
   }
   function set(key, value) {
     const validated = validate(key, value);
@@ -197,7 +183,7 @@ var OMNTP = (() => {
     if (key === "lock" || key === "newtab" || key === "show_root" || key.startsWith("number")) {
       emit(Events.COLUMNS_CHANGED, null);
     } else if (key === "theme") {
-      currentTheme2 = THEMES[validated] || {};
+      currentTheme = THEMES[validated] || {};
       for (const k of Object.keys(DEFAULTS2)) {
         if (k !== key) emit(Events.CONFIG_CHANGED, { key: k, value: get(k) });
       }
@@ -209,7 +195,7 @@ var OMNTP = (() => {
     return validated;
   }
   function loadAll() {
-    currentTheme2 = THEMES[get("theme")] || {};
+    currentTheme = THEMES[get("theme")] || {};
     for (const key of Object.keys(DEFAULTS2)) {
       if (key === "background_image_file") {
         setTimeout(() => emit(Events.CONFIG_CHANGED, { key, value: get(key) }), 0);
@@ -371,175 +357,6 @@ var OMNTP = (() => {
     return `/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=${size}`;
   }
 
-  // src/config/ui.js
-  var settingsInitialized = false;
-  function initConfig(key) {
-    const input = document.getElementById("options_" + key);
-    if (!input) return;
-    if (input.type === "color") {
-      input.type = "text";
-      input.className = "color";
-      const swatch = document.createElement("input");
-      swatch.type = "color";
-      swatch.value = input.value;
-      swatch.oninput = (event) => {
-        input.value = event.target.value;
-        input.onchange(event);
-      };
-      input.swatch = swatch;
-      input.parentNode.appendChild(swatch);
-    }
-    input.onchange = (event) => {
-      if (input.type === "file") {
-        if (event.target.files.length === 1) {
-          const file = event.target.files[0];
-          if (file.size > 2097152) {
-            input.value = null;
-            alert("Image must be less than 2 MB.");
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (f) => {
-            if (f.target.result) set(key, f.target.result);
-          };
-          reader.readAsDataURL(file);
-        }
-      } else {
-        set(key, input.type === "checkbox" ? Number(input.checked) : input.value);
-      }
-    };
-    const reset = document.createElement("a");
-    reset.className = "revert";
-    reset.title = "Reset to default";
-    reset.tabIndex = -1;
-    reset.onclick = () => {
-      set(key, null);
-      showConfig(key);
-      return false;
-    };
-    input.reset = reset;
-    input.parentNode.appendChild(reset);
-    showConfig(key);
-  }
-  function initSettings() {
-    if (settingsInitialized) return;
-    settingsInitialized = true;
-    document.getElementById("options_close_button").onclick = () => {
-      showOptions(false);
-      return false;
-    };
-    const options = document.getElementById("options");
-    const nav = document.getElementById("options_nav");
-    let activeIndex = 0;
-    for (let i = 0; i < nav.children.length; i++) {
-      const a = nav.children[i].firstChild;
-      a.onclick = (e) => {
-        nav.children[activeIndex].firstChild.classList.remove("current");
-        options.getElementsByClassName("section")[activeIndex].classList.remove("current");
-        activeIndex = Array.prototype.indexOf.call(nav.children, e.target.parentNode);
-        nav.children[activeIndex].firstChild.classList.add("current");
-        options.getElementsByClassName("section")[activeIndex].classList.add("current");
-        if (activeIndex === nav.children.length - 1) {
-          const allcss = document.getElementById("all_css");
-          allcss.value = getAllCSS();
-        }
-        if (activeIndex === nav.children.length - 2) {
-          const exports = document.getElementById("options_export");
-          const imports = document.getElementById("options_import");
-          const replacer = (k, v) => k === "options.background_image_file" ? void 0 : v;
-          exports.value = JSON.stringify(localStorage, replacer);
-          imports.value = "";
-          imports.placeholder = "Paste exported settings here";
-          imports.onchange = () => {
-            try {
-              const imported = JSON.parse(imports.value);
-              for (const k in imported) localStorage.setItem(k, imported[k]);
-              imports.value = "";
-              imports.placeholder = "Import successful!";
-              exports.value = JSON.stringify(localStorage, replacer);
-              loadAll();
-              emit(Events.COLUMNS_CHANGED, null);
-            } catch (e2) {
-              imports.value = "";
-              imports.placeholder = "Import error! Please check if your settings are valid JSON.";
-            }
-          };
-        }
-        return false;
-      };
-    }
-    bmGetSubTree("0").then((result) => {
-      if (!result || !result[0]) return;
-      const placeholder = document.getElementById("options_show_bookmarks");
-      const nodes = result[0].children;
-      for (const node of nodes) {
-        const key = "show_" + node.id;
-        DEFAULTS2[key] = 1;
-        const span = document.createElement("span");
-        span.textContent = node.title;
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.id = "options_" + key;
-        const label = document.createElement("label");
-        label.appendChild(span);
-        label.appendChild(input);
-        placeholder.appendChild(label);
-      }
-      if (chrome.fontSettings) {
-        const input = document.getElementById("options_font");
-        const select2 = document.createElement("select");
-        input.parentNode.replaceChild(select2, input);
-        select2.id = input.id;
-        chrome.fontSettings.getFontList((fonts) => {
-          fonts.unshift({ fontId: "Sans-serif" });
-          for (const font of fonts) {
-            const option = document.createElement("option");
-            option.textContent = font.fontId;
-            if (font.fontId === get("font")) option.selected = true;
-            select2.appendChild(option);
-          }
-        });
-      }
-      for (const key of Object.keys(DEFAULTS2)) initConfig(key);
-      loadAll();
-      const select = document.getElementById("options_theme");
-      if (select.childNodes.length === 0) {
-        for (const name of getThemeNames()) {
-          const option = document.createElement("option");
-          option.textContent = name;
-          if (name === get("theme")) option.selected = true;
-          select.appendChild(option);
-        }
-      }
-    });
-  }
-  function showConfig(key) {
-    const input = document.getElementById("options_" + key);
-    if (!input || input.type === "file") return;
-    const value = get(key);
-    if (input.type === "checkbox") input.checked = Boolean(value);
-    else input.value = value;
-    const isDefault = value === (DEFAULTS2[key] || currentTheme && currentTheme[key]);
-    if (input.reset) input.reset.style.visibility = isDefault ? "hidden" : "visible";
-    if (input.swatch) input.swatch.value = value;
-  }
-  function showOptions(show) {
-    document.getElementById("options").style.display = show ? "block" : "none";
-    if (show) {
-      if (!settingsInitialized) initSettings();
-      for (const key of Object.keys(DEFAULTS2)) showConfig(key);
-    }
-  }
-  function getAllCSS() {
-    let css = "";
-    for (const key of Object.keys(DEFAULTS2)) {
-      if (key === "css") continue;
-      const c = generateCSS(key, get(key));
-      if (c && c.length < 1e3) css += c + "\n";
-    }
-    return css;
-  }
-
   // src/bookmarks/special-nodes.js
   var SPECIAL = {
     apps: {
@@ -579,9 +396,6 @@ var OMNTP = (() => {
     }
   };
   var specialKeys = Object.keys(SPECIAL);
-  function getSpecialNode(id) {
-    return SPECIAL[id];
-  }
   function isSpecial(id) {
     return id in SPECIAL;
   }
@@ -664,64 +478,6 @@ var OMNTP = (() => {
   }
   var getChildrenFunction = null;
   var renderAll = null;
-  function setGetChildrenFunction(fn) {
-    getChildrenFunction = fn;
-  }
-  function setRenderAll(fn) {
-    renderAll = fn;
-  }
-
-  // src/bookmarks/tree.js
-  function getChildrenFunction2(node) {
-    if (isSpecial(node.id)) {
-      const specialNode = getSpecialNode(node.id);
-      const load = specialNode.children;
-      return load || (() => callback([]));
-    }
-    if (node.children) {
-      return (callback2) => callback2(node.children);
-    }
-    return (callback2) => {
-      bmGetSubTree(node.id).then(
-        (result) => {
-          if (result) callback2(result[0].children);
-          else {
-            if (state.coords[node.id]) removeRow(state.coords[node.id].x, state.coords[node.id].y);
-            callback2([]);
-          }
-        },
-        () => {
-          if (state.coords[node.id]) removeRow(state.coords[node.id].x, state.coords[node.id].y);
-          callback2([]);
-        }
-      );
-    };
-  }
-  function getSubTree(id, callback2) {
-    if (isSpecial(id)) {
-      const s = getSpecialNode(id);
-      const node = { title: s.label, id };
-      if (s.url) node.url = s.url;
-      else node.children = true;
-      callback2([node]);
-      return;
-    }
-    bmGetSubTree(id).then(
-      (result) => {
-        if (result) callback2(result);
-        else {
-          if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
-        }
-      },
-      () => {
-        if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
-      }
-    );
-  }
-  var removeRow = null;
-  function setRemoveRow(fn) {
-    removeRow = fn;
-  }
 
   // src/bookmarks/layout.js
   mutations.setSpecial(SPECIAL);
@@ -799,45 +555,6 @@ var OMNTP = (() => {
     }
     loadColumns();
   }
-  function addColumn(ids, index) {
-    const column = ids.slice(0);
-    for (let x = 0; x < state.columns.length; x++) {
-      for (let y = 0; y < state.columns[x].length; y++) {
-        if (ids.indexOf(state.columns[x][y]) > -1) {
-          state.columns[x].splice(y, 1);
-          y--;
-        }
-      }
-    }
-    if (index === null) index = state.columns.length;
-    state.columns.splice(Math.min(index, state.columns.length), 0, column);
-    saveColumns();
-  }
-  function removeColumn(index) {
-    state.columns.splice(index, 1);
-    saveColumns();
-  }
-  function addRow(id, xpos, ypos) {
-    if (ypos === null) ypos = state.columns[xpos].length;
-    for (let x = 0; x < state.columns.length; x++) {
-      const i = state.columns[x].indexOf(id);
-      if (i > -1) {
-        state.columns[x].splice(i, 1);
-        if (x === xpos && ypos > i) ypos--;
-      }
-      if (state.columns[x].length === 0) {
-        state.columns.splice(x, 1);
-        x--;
-        if (xpos > x) xpos--;
-      }
-    }
-    state.columns[xpos].splice(Math.min(ypos, state.columns[xpos].length), 0, id);
-    saveColumns();
-  }
-  function removeRow2(xpos, ypos) {
-    state.columns[xpos].splice(ypos, 1);
-    saveColumns();
-  }
   function removeFromLayout(ids) {
     for (let x = state.columns.length - 1; x >= 0; x--) {
       const col = state.columns[x];
@@ -891,9 +608,6 @@ var OMNTP = (() => {
   }
   var scheduleRestore = null;
   var renderColumns = null;
-  function setScheduleRestore(fn) {
-    scheduleRestore = fn;
-  }
 
   // src/bookmarks/crud.js
   function isRealBookmarkId(id) {
@@ -992,20 +706,6 @@ var OMNTP = (() => {
     const results = await bmGetSubTree(sourceId);
     if (!results || !results[0]) return null;
     return cloneNode(results[0], destParentId, index);
-  }
-  async function folderMoveDrop(dragIds2, folderNodeId) {
-    if (!folderNodeId || !isRealBookmarkId(folderNodeId)) return;
-    const ids = (dragIds2 || []).filter((id) => clipTargetableId(id) && id !== folderNodeId);
-    if (ids.length === 0) return;
-    const movedIds = [];
-    for (const id of ids) {
-      const moved = await bmMove(id, { parentId: folderNodeId });
-      if (moved) movedIds.push(id);
-    }
-    if (movedIds.length > 0) {
-      removeFromLayout(movedIds);
-      saveColumns();
-    }
   }
   function clipTargetableId(id) {
     return isRealBookmarkId(id) && Array.isArray(state.root) && state.root.indexOf(id) < 0;
@@ -1126,9 +826,6 @@ var OMNTP = (() => {
     }, duration);
   }
   var getChildrenFunction3 = null;
-  function setGetChildrenFunctionForFolder(fn) {
-    getChildrenFunction3 = fn;
-  }
 
   // src/render/node.js
   function setClass(target, node, isOpen) {
@@ -1161,19 +858,6 @@ var OMNTP = (() => {
   var getConfig = get;
   var addFolderHandlers = null;
   var enableDragFolder = null;
-  function setGetChildrenFunction2(fn) {
-    getChildrenFunction4 = fn;
-    setGetChildrenFunctionForFolder(fn);
-  }
-  function setGetConfig(fn) {
-    getConfig = fn;
-  }
-  function setAddFolderHandlers(fn) {
-    addFolderHandlers = fn;
-  }
-  function setEnableDragFolder(fn) {
-    enableDragFolder = fn;
-  }
   function render(node, target) {
     if (node.description === "separator") return;
     const li = document.createElement("li");
@@ -1252,173 +936,6 @@ var OMNTP = (() => {
     return ul;
   }
 
-  // src/interaction/drag-drop.js
-  var dragIds = null;
-  var dropTarget = null;
-  function enableDragColumn(id, column) {
-    if (get("lock")) return;
-    column.draggable = true;
-    column.ondragstart = (event) => {
-      dragIds = state.columns[id];
-      event.dataTransfer.effectAllowed = "move";
-      column.classList.add("dragstart");
-    };
-    column.ondragend = () => {
-      dragIds = null;
-      column.classList.remove("dragstart");
-      clearDropTarget();
-    };
-  }
-  function enableDragFolder2(node, anchor) {
-    if (get("lock")) return;
-    anchor.draggable = true;
-    anchor.ondragstart = (event) => {
-      dragIds = [node.id];
-      event.stopPropagation();
-      event.dataTransfer.effectAllowed = "move copy";
-      anchor.classList.add("dragstart");
-    };
-    anchor.ondragend = () => {
-      dragIds = null;
-      anchor.classList.remove("dragstart");
-      clearDropTarget();
-    };
-  }
-  function enableDragDrop() {
-    const main = document.getElementById("main");
-    if (get("lock")) {
-      main.ondragover = null;
-      main.ondragleave = null;
-      main.ondrop = null;
-      return;
-    }
-    main.ondragover = (event) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      const target = getDropTarget(event);
-      if (target) {
-        clearDropTarget();
-        dropTarget = target;
-        const bordercss = "solid 2px " + get("font_color");
-        if (target.tagName === "LI" || target.tagName === "UL") {
-          if (isAbove(event.pageY, target)) {
-            target.style.borderBottom = bordercss;
-            target.style.margin = "0 0 -2px 0";
-          } else {
-            target.style.borderTop = bordercss;
-            target.style.margin = "-2px 0 0 0";
-          }
-        } else if (target.className === "column") {
-          if (event.pageX - target.offsetLeft > target.clientWidth / 2) {
-            target.style.borderRight = bordercss;
-            target.style.margin = "0";
-          } else {
-            target.style.borderLeft = bordercss;
-            target.style.margin = "0 2px 0 -2px";
-          }
-        } else if (target.tagName === "A") {
-          target.style.border = bordercss;
-        }
-      }
-      return false;
-    };
-    main.ondragleave = () => {
-      clearDropTarget();
-    };
-    main.ondrop = (event) => {
-      event.stopPropagation();
-      const target = getDropTarget(event);
-      if (!target) return false;
-      if (target.tagName === "A" && target.classList.contains("folder")) {
-        folderMoveDrop(dragIds, target._vimNode ? target._vimNode.id : null);
-        return false;
-      }
-      let x = getDropX(target, event);
-      const y = getDropY(target, event);
-      if (dragIds.length === 1 && y != null) addRow(dragIds[0], x, y);
-      else {
-        if (event.pageX - target.offsetLeft > target.clientWidth / 2) x++;
-        addColumn(dragIds, x);
-      }
-      return false;
-    };
-  }
-  function getDropTarget(event) {
-    if (!dragIds) return null;
-    let target = event.target;
-    let a = target && target.tagName === "A" ? target : target.parentNode && target.parentNode.tagName === "A" ? target.parentNode : null;
-    if (a && a.classList.contains("folder") && dragIds.length === 1) {
-      const rect = a.getBoundingClientRect();
-      const cy = event.clientY;
-      if (cy - rect.top > 6 && rect.bottom - cy > 6) return a;
-    }
-    if (target && (target.tagName === "A" || target.parentNode.tagName === "A") && dragIds.length === 1) {
-      while (target && target.parentNode.parentNode && target.parentNode.parentNode.className !== "column") {
-        target = target.parentNode;
-      }
-      if (target && target.tagName === "LI" && state.columns[getDropX(target, event)].length === 1)
-        target = target.parentNode;
-    } else {
-      while (target && target.className !== "column") target = target.parentNode;
-    }
-    return target;
-  }
-  function getDropX(target, event) {
-    let x = null;
-    while (target && target.className !== "column") target = target.parentNode;
-    if (target) {
-      x = 0;
-      for (; target.previousSibling; x++) target = target.previousSibling;
-    }
-    return x;
-  }
-  function getDropY(target, event) {
-    let y = null;
-    if (target.tagName === "LI") {
-      y = 0;
-      if (isAbove(event.pageY, target)) y++;
-      for (; target.previousSibling; y++) target = target.previousSibling;
-    } else if (target.tagName === "UL") {
-      y = 0;
-      if (isAbove(event.pageY, target)) y++;
-    }
-    return y;
-  }
-  function isAbove(pageY, target) {
-    return pageY - window.scrollY - target.getBoundingClientRect().top > target.clientHeight / 2;
-  }
-  function clearDropTarget() {
-    if (dropTarget) {
-      dropTarget.style.border = null;
-      dropTarget.style.margin = null;
-    }
-    dropTarget = null;
-  }
-
-  // src/render/renderer.js
-  function renderColumns2() {
-    const target = document.getElementById("main");
-    while (target.hasChildNodes()) target.removeChild(target.lastChild);
-    for (let i = 0; i < state.columns.length; i++) {
-      const column = document.createElement("div");
-      column.className = "column";
-      column.style.width = 1 / state.columns.length * 100 + "%";
-      if (enableDragColumn) enableDragColumn(i, column);
-      target.appendChild(column);
-      renderColumn(i, column);
-    }
-    if (enableDragDrop) enableDragDrop();
-    emit(Events.RENDER_COMPLETE);
-  }
-  var enableDragColumnFn = null;
-  var enableDragDropFn = null;
-  function setEnableDragColumn(fn) {
-    enableDragColumnFn = fn;
-  }
-  function setEnableDragDrop(fn) {
-    enableDragDropFn = fn;
-  }
-
   // src/interaction/context-menu.js
   function onMenuClick(item, ul) {
     return function() {
@@ -1427,7 +944,7 @@ var OMNTP = (() => {
       return false;
     };
   }
-  function renderMenu2(items, x, y, label) {
+  function renderMenu(items, x, y, label) {
     const ul = document.createElement("ul");
     ul.className = "menu";
     ul.setAttribute("role", "menu");
@@ -1527,163 +1044,6 @@ var OMNTP = (() => {
     document.onkeydown = null;
     if (ul && ul._prevFocus && ul._prevFocus.focus) ul._prevFocus.focus();
   }
-  function getMenuItems(node) {
-    const items = [];
-    items.push({
-      label: "Open all links in folder",
-      action: () => {
-        openLinks(node);
-      }
-    });
-    if (node.id === "closed")
-      items.push({
-        label: "Clear browsing data",
-        action: () => {
-          openLink({ url: "chrome://settings/clearBrowserData" }, 1);
-        }
-      });
-    if (node.id === "devices")
-      items.push({
-        label: "History",
-        action: () => {
-          openLink({ url: "chrome://history" }, 1);
-        }
-      });
-    if (node.id && /^\d+$/.test(node.id))
-      items.push({
-        label: "Edit bookmarks",
-        action: () => {
-          openLink({ url: "chrome://bookmarks/?id=" + node.id }, 1);
-        }
-      });
-    return items;
-  }
-  function openLinks(node) {
-    chrome.tabs.getCurrent((tab) => {
-      getChildrenFunction5(node)((result) => {
-        for (let i = 0; i < result.length; i++) openLinkFn(result[i], 2);
-      });
-    });
-  }
-  var getChildrenFunction5 = null;
-  var openLinkFn = null;
-  function setGetChildrenFunction3(fn) {
-    getChildrenFunction5 = fn;
-  }
-  function setOpenLink(fn) {
-    openLinkFn = fn;
-  }
-  function addFolderHandlers2(node, anchor) {
-    anchor.onclick = () => {
-      toggle(node, anchor, getChildrenFunction5(node));
-      return false;
-    };
-    let items = getMenuItems(node);
-    if (!get("lock")) {
-      items.push(null);
-      items.push({
-        label: "Create new column",
-        action: () => {
-          addColumn([node.id]);
-        }
-      });
-      if (state.coords[node.id]) {
-        const pos = state.coords[node.id];
-        if (pos.y > 0)
-          items.push({ label: "Move folder up", action: () => {
-            addRow(node.id, pos.x, pos.y - 1);
-          } });
-        if (pos.y < state.columns[pos.x].length - 1)
-          items.push({ label: "Move folder down", action: () => {
-            addRow(node.id, pos.x, pos.y + 2);
-          } });
-        if (pos.x > 0)
-          items.push({ label: "Move folder left", action: () => {
-            addRow(node.id, pos.x - 1);
-          } });
-        if (pos.x < state.columns.length - 1)
-          items.push({ label: "Move folder right", action: () => {
-            addRow(node.id, pos.x + 1);
-          } });
-        if (state.root.indexOf(node.id) < 0)
-          items.push({ label: "Remove folder", action: () => {
-            removeRow2(pos.x, pos.y);
-          } });
-      }
-    }
-    anchor.oncontextmenu = (event) => {
-      renderMenu2(items, event.pageX, event.pageY);
-      return false;
-    };
-  }
-  function addColumnHandlers(index, target) {
-    let items = [];
-    const ids = state.columns[index];
-    if (!ids) return;
-    if (ids.length === 1) items = getMenuItems({ id: ids[0] });
-    if (!get("lock") && state.columns.length > 1) {
-      items.push(null);
-      if (index > 0)
-        items.push({ label: "Move column left", action: () => {
-          addColumn(ids, index - 1);
-        } });
-      if (index < state.columns.length - 1)
-        items.push({ label: "Move column right", action: () => {
-          addColumn(ids, index + 2);
-        } });
-      items.push({ label: "Remove column", action: () => {
-        removeColumn(index);
-      } });
-      if (ids.length === 1) {
-        if (index > 0)
-          items.push({ label: "Move folder left", action: () => {
-            addRow(ids[0], index - 1);
-          } });
-        if (index < state.columns.length - 1)
-          items.push({ label: "Move folder right", action: () => {
-            addRow(ids[0], index + 1);
-          } });
-      }
-    }
-    if (items.length > 0)
-      target.oncontextmenu = (event) => {
-        if (event.target.tagName === "A" || event.target.parentNode.tagName === "A") return true;
-        renderMenu2(items, event.pageX, event.pageY);
-        return false;
-      };
-  }
-
-  // src/render/column.js
-  function renderColumn(index, target) {
-    const ids = state.columns[index];
-    if (!ids) return;
-    if (ids.length === 1 && !get("show_root")) {
-      getChildrenFunction2({ id: ids[0] })((result) => {
-        if (!state.columns[index]) return;
-        renderAll2(result, target);
-        if (addColumnHandlers) addColumnHandlers(index, target);
-      });
-    } else if (ids.length > 0) {
-      let i = 0;
-      const nodes = [];
-      const callback2 = (result) => {
-        if (!state.columns[index]) return;
-        for (let j = 0; j < result.length; j++) nodes.push(result[j]);
-        i++;
-        if (i < ids.length) {
-          getSubTree(ids[i], callback2);
-        } else {
-          renderAll2(nodes, target, true);
-          if (addColumnHandlers) addColumnHandlers(index, target);
-        }
-      };
-      getSubTree(ids[i], callback2);
-    }
-  }
-  var addColumnHandlersFn = null;
-  function setAddColumnHandlers(fn) {
-    addColumnHandlersFn = fn;
-  }
 
   // src/interaction/modal.js
   function showModal(options) {
@@ -1752,7 +1112,7 @@ var OMNTP = (() => {
     else cancel.focus();
   }
 
-  // src/interaction/keyboard.js
+  // src/vim/cursor.js
   function clamp(val, min, max) {
     return Math.max(min, Math.min(max, val));
   }
@@ -1762,9 +1122,13 @@ var OMNTP = (() => {
     const first = column.firstChild;
     if (!first) return [];
     let container;
-    if (first.tagName === "UL") container = first;
-    else if (first.tagName === "DIV" && first.firstChild) container = first.firstChild;
-    else return [];
+    if (first.tagName === "UL") {
+      container = first;
+    } else if (first.tagName === "DIV" && first.firstChild) {
+      container = first.firstChild;
+    } else {
+      return [];
+    }
     const links = [];
     collectLinks(container, links);
     return links;
@@ -1774,9 +1138,13 @@ var OMNTP = (() => {
       const li = container.children[i];
       if (li.tagName !== "LI") continue;
       const a = li.firstChild;
-      if (a && a.tagName === "A") links.push(a);
+      if (a && a.tagName === "A") {
+        links.push(a);
+      }
       const next = a ? a.nextSibling : null;
-      if (next && next.tagName === "DIV" && next.firstChild) collectLinks(next.firstChild, links);
+      if (next && next.tagName === "DIV" && next.firstChild) {
+        collectLinks(next.firstChild, links);
+      }
     }
   }
   function updateCursorVisuals() {
@@ -1793,10 +1161,49 @@ var OMNTP = (() => {
     for (let i = 0; i < allLinks.length; i++) {
       const link = allLinks[i];
       const id = link._vimNode && link._vimNode.id;
-      if (id && state.vimSelected.has(id)) link.classList.add("vim-selected");
-      else link.classList.remove("vim-selected");
-      if (cutting && id && state.clipboard.ids.indexOf(id) > -1) link.classList.add("vim-cut");
-      else link.classList.remove("vim-cut");
+      if (id && state.vimSelected.has(id)) {
+        link.classList.add("vim-selected");
+      } else {
+        link.classList.remove("vim-selected");
+      }
+      if (cutting && id && state.clipboard.ids.indexOf(id) > -1) {
+        link.classList.add("vim-cut");
+      } else {
+        link.classList.remove("vim-cut");
+      }
+    }
+  }
+  function resolveCursor() {
+    if (!state.columns || state.columns.length === 0) return;
+    mutations.setVimCursor(clamp(state.vimCursor.x, 0, state.columns.length - 1), state.vimCursor.y);
+    if (state.vimPendingRestore != null) restoreCursor(state.vimPendingRestore);
+    const links = getVisibleLinks(state.vimCursor.x);
+    mutations.setVimCursor(state.vimCursor.x, clamp(state.vimCursor.y, 0, Math.max(0, links.length - 1)));
+    updateCursorVisuals();
+  }
+  function restoreCursor(id) {
+    for (let x = 0; x < state.columns.length; x++) {
+      if (state.columns[x].indexOf(id) === -1) continue;
+      mutations.setVimCursor(x, state.vimCursor.y);
+      const links = getVisibleLinks(x);
+      for (let i = 0; i < links.length; i++) {
+        if (links[i]._vimNode && links[i]._vimNode.id === id) {
+          mutations.setVimCursor(x, i);
+          break;
+        }
+      }
+      mutations.clearVimPendingRestore();
+      return;
+    }
+    for (let x = 0; x < state.columns.length; x++) {
+      const links = getVisibleLinks(x);
+      for (let i = 0; i < links.length; i++) {
+        if (links[i]._vimNode && links[i]._vimNode.id === id) {
+          mutations.setVimCursor(x, i);
+          mutations.clearVimPendingRestore();
+          return;
+        }
+      }
     }
   }
   function moveCursor(dx, dy) {
@@ -1812,87 +1219,8 @@ var OMNTP = (() => {
     }
     updateCursorVisuals();
   }
-  function vimActivate() {
-    if (!state.vimEl) return;
-    const isFolder = state.vimEl.classList.contains("folder");
-    if (isFolder) {
-      const node = state.vimEl._vimNode;
-      if (node) toggle(node, state.vimEl);
-    } else {
-      state.vimEl.dispatchEvent(new MouseEvent("click"));
-    }
-  }
-  function vimOpenFolder() {
-    if (!state.vimEl || !state.vimEl.classList.contains("folder")) return;
-    const node = state.vimEl._vimNode;
-    if (node) toggle(node, state.vimEl);
-  }
-  function createNodeDialog(isFolder) {
-    const context = getInsertionContext();
-    const fields = isFolder ? [{ label: "Name", placeholder: "New folder" }] : [{ label: "Name", placeholder: "Example" }, { label: "URL", placeholder: "example.com" }];
-    showModal({
-      title: isFolder ? "New folder" : "New bookmark",
-      fields,
-      submitLabel: "Create",
-      onSubmit: (values) => {
-        const title = values[0].trim();
-        const props = { parentId: context.parentId };
-        if (isFolder) {
-          if (!title) return false;
-          props.title = title;
-        } else {
-          const url = normalizeUrl(values[1]);
-          if (!url) return false;
-          props.title = title || url;
-          props.url = url;
-        }
-        createBookmarkAt(props, context.afterId);
-        return true;
-      }
-    });
-  }
-  function editNodeDialog() {
-    if (!state.vimEl || !state.vimEl._vimNode) return;
-    const node = state.vimEl._vimNode;
-    if (!isRealBookmarkId(node.id)) return;
-    const isFolder = state.vimEl.classList.contains("folder");
-    const fields = isFolder ? [{ label: "Name", placeholder: "Folder name", value: node.title }] : [{ label: "Name", placeholder: "Bookmark name", value: node.title }, { label: "URL", placeholder: "example.com", value: node.url }];
-    showModal({
-      title: isFolder ? "Edit folder" : "Edit bookmark",
-      fields,
-      submitLabel: "Save",
-      onSubmit: (values) => {
-        const props = {};
-        if (isFolder) {
-          const title = values[0].trim();
-          if (!title) return false;
-          props.title = title;
-        } else {
-          const url = normalizeUrl(values[1]);
-          if (!url) return false;
-          props.title = values[0].trim() || url;
-          props.url = url;
-        }
-        updateBookmark(node.id, props);
-        return true;
-      }
-    });
-  }
-  function vimDelete() {
-    if (!state.vimEl || !state.vimEl._vimNode) return;
-    const ids = vimGetTargetIds();
-    if (ids.length === 0) return;
-    const message = state.vimSelected.size === 0 ? 'Delete "' + (state.vimEl._vimNode.title || state.vimEl._vimNode.url || "this item") + '"?' : "Delete " + ids.length + " selected item(s)?";
-    showModal({
-      title: message,
-      fields: [],
-      submitLabel: "Delete",
-      onSubmit: () => {
-        deleteBookmarksByIds(ids);
-        return true;
-      }
-    });
-  }
+
+  // src/vim/selection.js
   function vimGetTargetIds() {
     const ids = state.vimSelected.size > 0 ? Array.from(state.vimSelected) : state.vimEl && state.vimEl._vimNode ? [state.vimEl._vimNode.id] : [];
     return ids.filter(clipTargetableId);
@@ -1929,9 +1257,22 @@ var OMNTP = (() => {
     mutations.clearClipboard();
     updateCursorVisuals();
   }
-  async function vimPaste(below) {
+  function vimPaste(below) {
     if (state.clipboard.mode == null || state.clipboard.ids.length === 0) return;
-    await pasteBatch(state.clipboard.mode, state.clipboard.ids.slice(0), below);
+    pasteBatch(state.clipboard.mode, state.clipboard.ids.slice(0), below);
+  }
+  async function getPasteDestination(below) {
+    if (!(state.vimEl && state.vimEl._vimNode))
+      return { parentId: getDefaultParentId() };
+    const node = state.vimEl._vimNode;
+    if (node.id === "empty")
+      return { parentId: findParentFolderId(state.vimEl.parentNode) || getDefaultParentId() };
+    if (!clipTargetableId(node.id))
+      return { parentId: getDefaultParentId() };
+    const results = await bmGet(node.id);
+    if (!results || !results[0])
+      return { parentId: getDefaultParentId() };
+    return { anchorId: node.id, below: !!below };
   }
   async function pasteBatch(mode, ids, below) {
     const dest = await getPasteDestination(below);
@@ -1956,7 +1297,10 @@ var OMNTP = (() => {
         if (dest.anchorId) {
           const anc = await bmGet(dest.anchorId);
           if (!anc || !anc[0]) break;
-          props = { parentId: anc[0].parentId, index: below ? anc[0].index + 1 + i : anc[0].index };
+          props = {
+            parentId: anc[0].parentId,
+            index: below ? anc[0].index + 1 + i : anc[0].index
+          };
         } else {
           props = { parentId, index: null };
         }
@@ -1966,7 +1310,11 @@ var OMNTP = (() => {
         done.push(moved.id);
       } else {
         if (!clipTargetableId(ids[i])) continue;
-        const created = await copyBookmarkSubtree(ids[i], parentId, base == null ? null : Math.max(0, Math.min(base + i, len)));
+        const created = await copyBookmarkSubtree(
+          ids[i],
+          parentId,
+          base == null ? null : Math.max(0, Math.min(base + i, len))
+        );
         if (!created) continue;
         len++;
         done.push(created.id);
@@ -1976,14 +1324,94 @@ var OMNTP = (() => {
     if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
     else updateCursorVisuals();
   }
-  async function getPasteDestination(below) {
-    if (!(state.vimEl && state.vimEl._vimNode)) return { parentId: getDefaultParentId() };
+
+  // src/vim/actions.js
+  function vimActivate() {
+    if (!state.vimEl) return;
+    const isFolder = state.vimEl.classList.contains("folder");
+    if (isFolder) {
+      const node = state.vimEl._vimNode;
+      if (node) toggle(node, state.vimEl);
+    } else {
+      state.vimEl.dispatchEvent(new MouseEvent("click"));
+    }
+  }
+  function vimOpenFolder() {
+    if (!state.vimEl || !state.vimEl.classList.contains("folder")) return;
     const node = state.vimEl._vimNode;
-    if (node.id === "empty") return { parentId: findParentFolderId(state.vimEl.parentNode) || getDefaultParentId() };
-    if (!clipTargetableId(node.id)) return { parentId: getDefaultParentId() };
-    const results = await bmGet(node.id);
-    if (!results || !results[0]) return { parentId: getDefaultParentId() };
-    return { anchorId: node.id, below: !!below };
+    if (node) toggle(node, state.vimEl);
+  }
+  function createNodeDialog(isFolder) {
+    const context = getInsertionContext();
+    const fields = isFolder ? [{ label: "Name", placeholder: "New folder" }] : [
+      { label: "Name", placeholder: "Example" },
+      { label: "URL", placeholder: "example.com" }
+    ];
+    showModal({
+      title: isFolder ? "New folder" : "New bookmark",
+      fields,
+      submitLabel: "Create",
+      onSubmit: (values) => {
+        const title = values[0].trim();
+        const props = { parentId: context.parentId };
+        if (isFolder) {
+          if (!title) return false;
+          props.title = title;
+        } else {
+          const url = normalizeUrl(values[1]);
+          if (!url) return false;
+          props.title = title || url;
+          props.url = url;
+        }
+        createBookmarkAt(props, context.afterId);
+        return true;
+      }
+    });
+  }
+  function editNodeDialog() {
+    if (!state.vimEl || !state.vimEl._vimNode) return;
+    const node = state.vimEl._vimNode;
+    if (!isRealBookmarkId(node.id)) return;
+    const isFolder = state.vimEl.classList.contains("folder");
+    const fields = isFolder ? [{ label: "Name", placeholder: "Folder name", value: node.title }] : [
+      { label: "Name", placeholder: "Bookmark name", value: node.title },
+      { label: "URL", placeholder: "example.com", value: node.url }
+    ];
+    showModal({
+      title: isFolder ? "Edit folder" : "Edit bookmark",
+      fields,
+      submitLabel: "Save",
+      onSubmit: (values) => {
+        const props = {};
+        if (isFolder) {
+          const title = values[0].trim();
+          if (!title) return false;
+          props.title = title;
+        } else {
+          const url = normalizeUrl(values[1]);
+          if (!url) return false;
+          props.title = values[0].trim() || url;
+          props.url = url;
+        }
+        updateBookmark(node.id, props);
+        return true;
+      }
+    });
+  }
+  function vimDelete() {
+    if (!state.vimEl || !state.vimEl._vimNode) return;
+    const ids = vimGetTargetIds();
+    if (ids.length === 0) return;
+    const message = state.vimSelected.size === 0 ? 'Delete "' + (state.vimEl._vimNode.title || state.vimEl._vimNode.url || "this item") + '"?' : "Delete " + ids.length + " selected item(s)?";
+    showModal({
+      title: message,
+      fields: [],
+      submitLabel: "Delete",
+      onSubmit: () => {
+        deleteBookmarksByIds(ids);
+        return true;
+      }
+    });
   }
   function vimShowThemePicker() {
     const items = [];
@@ -1995,7 +1423,7 @@ var OMNTP = (() => {
         label: (name === current ? "\u25CF " : "  ") + name,
         selected: name === current,
         action: () => {
-          setConfig("theme", name);
+          set("theme", name);
         }
       });
     }
@@ -2007,11 +1435,36 @@ var OMNTP = (() => {
     }
     renderMenu(items, x, y, "Theme picker");
   }
+
+  // src/vim/observer.js
+  var vimRafPending = false;
+  var vimObserver = new MutationObserver(() => {
+    if (vimRafPending) return;
+    vimRafPending = true;
+    requestAnimationFrame(() => {
+      vimRafPending = false;
+      resolveCursor();
+    });
+  });
+  function vimInit() {
+    const main = document.getElementById("main");
+    if (main) {
+      vimObserver.observe(main, { childList: true, subtree: true });
+    }
+    resolveCursor();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", vimInit);
+  } else {
+    vimInit();
+  }
+
+  // src/interaction/keyboard.js
   function initKeyboard() {
     document.addEventListener("keydown", (event) => {
       if (document.getElementById("options").style.display === "block") {
         if (event.key === "Escape") {
-          showOptions2(false);
+          showOptions(false);
           event.preventDefault();
         }
         return;
@@ -2079,7 +1532,7 @@ var OMNTP = (() => {
           vimShowThemePicker();
           break;
         case "/":
-          showOptions2(true);
+          showOptions(true);
           break;
         case "Escape":
           vimClearSelection();
@@ -2091,79 +1544,9 @@ var OMNTP = (() => {
       if (handled) event.preventDefault();
     });
   }
-  var showOptions2 = null;
-  function setShowOptions(fn) {
-    showOptions2 = fn;
-  }
+  var showOptions = null;
 
-  // src/shim.js
-  window.state = state;
-  window.getters = getters;
-  window.mutations = mutations;
-  window.columns = state.columns;
-  window.root = state.root;
-  window.coords = state.coords;
-  window.special = state.special;
-  window.vimCursor = state.vimCursor;
-  window.vimEl = state.vimEl;
-  window.vimSelected = state.vimSelected;
-  window.clipboard = state.clipboard;
-  window.vimPendingRestore = state.vimPendingRestore;
-  window.bmGet = bmGet;
-  window.bmGetSubTree = bmGetSubTree;
-  window.bmCreate = bmCreate;
-  window.bmUpdate = bmUpdate;
-  window.bmMove = bmMove;
-  window.bmRemove = bmRemove;
-  window.bmRemoveTree = bmRemoveTree;
-  window.saveColumns = saveColumns;
-  window.renderColumns = renderColumns2;
-  window.toggle = toggle;
-  window.getConfig = get;
-  window.setConfig = set;
-  window.themes = THEMES;
-  window.showOptions = showOptions;
-  window.renderMenu = renderMenu2;
-  window.getChildrenFunction = getChildrenFunction2;
-  window.SPECIAL = state.special;
-  window.clipTargetableId = clipTargetableId;
-  window.getCoords = getters.getCoords;
-  window.renderAll = renderAll2;
-  window.config = DEFAULTS2;
-  window.theme = {};
-  window.loadSettings = loadAll;
-  window.initSettings = initSettings;
-  window.initConfig = initConfig;
-  window.showConfig = showConfig;
-  window.onChange = onChange;
-  window.getStyle = generateCSS2;
-  window.scale = scale;
-  setRemoveRow(removeRow2);
-  setGetChildrenFunction(getChildrenFunction2);
-  setRenderAll(renderAll2);
-  setScheduleRestore(scheduleRestore);
-  setGetChildrenFunction2(getChildrenFunction2);
-  setGetConfig(get);
-  setAddFolderHandlers(addFolderHandlers2);
-  setEnableDragFolder(enableDragFolder2);
-  setAddColumnHandlers(addColumnHandlers);
-  setEnableDragColumn(enableDragColumn);
-  setEnableDragDrop(enableDragDrop);
-  setGetChildrenFunction3(getChildrenFunction2);
-  setOpenLink(openLink2);
-  setShowOptions(showOptions);
+  // src/entry.js
   loadAll();
   initKeyboard();
-  on(Events.RENDER_REQUESTED, () => {
-    if (window.renderColumns) window.renderColumns();
-  });
-  on("folder:toggle", ({ node, anchor }) => {
-    if (window.toggle) window.toggle(node, anchor);
-  });
-  on("menu:render", ({ items, x, y, label }) => {
-    if (window.renderMenu) window.renderMenu(items, x, y, label);
-  });
-  on("bookmarks:getChildrenFunction", (node) => {
-    if (window.getChildrenFunction) window.getChildrenFunction(node);
-  });
 })();

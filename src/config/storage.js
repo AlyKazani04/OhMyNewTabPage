@@ -4,7 +4,7 @@ import { emit, Events } from '../core/events.js';
 const PREFIX = "options.";
 
 // Current theme state
-let currentTheme = {};
+export let currentTheme = {};
 
 // Get config value
 export function get(key) {

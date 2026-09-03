@@ -1151,6 +1151,11 @@ function refreshClosed() {
   });
 }
 
+// ============================================================================
+// PHASE 2: Config system moved to src/config/*.js
+// The following code is commented out - functionality now in modular config system
+// ============================================================================
+/*
 // options : default values
 var config = {
   font: "Sans-serif",
@@ -1712,10 +1717,11 @@ function showOptions(show) {
     for (var key in config) showConfig(key);
   }
 }
+*/
 
 // initialize page
-loadSettings();
-loadColumns();
+// loadSettings();  // Now handled by config module via shim
+// loadColumns();   // Will be called by bookmarks module
 
 // keyboard shortcuts
 document.addEventListener("keypress", function (event) {
@@ -1742,10 +1748,10 @@ window.onresize = function (event) {
 
 // load options panel
 document.getElementById("options_button").onclick = function () {
-  showOptions(true);
+  // showOptions(true);  // Now handled by config module via shim
   return false;
 };
-if (location.search === "?options") showOptions(true);
+// if (location.search === "?options") showOptions(true);  // Now handled by config module
 
 // refresh recently closed
 if (chrome.sessions) chrome.sessions.onChanged.addListener(refreshClosed);

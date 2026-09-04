@@ -1,8 +1,7 @@
 import { state } from '../core/state.js';
 import { get } from '../config/storage.js';
 import { addColumn, removeColumn, addRow, removeRow, saveColumns } from '../bookmarks/layout.js';
-import { renderColumns } from '../render/renderer.js';
-import { toggle } from '../render/folder.js';
+import * as chromeApi from '../core/chrome-api.js';
 
 // Wraps click handler for menu items
 function onMenuClick(item, ul) {
@@ -130,25 +129,31 @@ export function getMenuItems(node) {
 }
 
 // Opens immediate children of given node in new tabs
-function openLinks(node) {
-  chrome.tabs.getCurrent((tab) => {
+async function openLinks(node) {
+  try {
+    await chromeApi.getCurrentTab();
     getChildrenFunction(node)((result) => {
       for (let i = 0; i < result.length; i++) openLinkFn(result[i], 2);
     });
-  });
+  } catch (err) {
+    console.warn('Failed to get current tab:', err);
+  }
 }
 
-// These will be set by shim
 let getChildrenFunction = null;
 let openLinkFn = null;
+let toggleFn = null;
+let renderColumnsFn = null;
 
 export function setGetChildrenFunction(fn) { getChildrenFunction = fn; }
 export function setOpenLink(fn) { openLinkFn = fn; }
+export function setToggle(fn) { toggleFn = fn; }
+export function setRenderColumns(fn) { renderColumnsFn = fn; }
 
 // Enables click and context menu for given folder
 export function addFolderHandlers(node, anchor) {
   // Click handler
-  anchor.onclick = () => { toggle(node, anchor, getChildrenFunction(node)); return false; };
+  anchor.onclick = () => { if (toggleFn) toggleFn(node, anchor, getChildrenFunction(node)); return false; };
 
   // Context menu handler
   let items = getMenuItems(node);

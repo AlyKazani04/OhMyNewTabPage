@@ -53,8 +53,3 @@ export function loadAll() {
     }
   }
 }
-
-// Migration for future schema changes
-export function migrate() {
-  // Placeholder for future migrations
-}

@@ -1,8 +1,6 @@
 import { state, mutations } from '../core/state.js';
 import { get, set } from '../config/storage.js';
 import { emit, Events } from '../core/events.js';
-import { renderColumns } from '../render/renderer.js';
-import { toggle } from '../render/folder.js';
 import { showModal } from './modal.js';
 import { renderMenu } from './context-menu.js';
 import { 
@@ -16,7 +14,6 @@ import {
   createNodeDialog,
   editNodeDialog,
   vimDelete,
-  vimGetTargetIds,
   vimToggleSelect,
   vimClearSelection,
   vimYank,

@@ -102,3 +102,30 @@ export function updateTab(id, props) {
 export function getFaviconUrl(pageUrl, size = 16) {
   return `/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=${size}`;
 }
+
+// Tabs API - getCurrent
+export function getCurrentTab() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.getCurrent((tab) => {
+      chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(tab);
+    });
+  });
+}
+
+// Bookmarks API - getRecent
+export function bmGetRecent(count) {
+  return new Promise((resolve, reject) => {
+    chrome.bookmarks.getRecent(count, (result) => {
+      chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(result);
+    });
+  });
+}
+
+// Sessions API - restore
+export function restoreSession(sessionId) {
+  return new Promise((resolve, reject) => {
+    chrome.sessions.restore(sessionId, () => {
+      chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve();
+    });
+  });
+}

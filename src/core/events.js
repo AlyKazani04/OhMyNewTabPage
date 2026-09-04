@@ -13,7 +13,15 @@ export function off(event, handler) {
 
 export function emit(event, data) {
   const set = handlers.get(event);
-  if (set) set.forEach(h => h(data));
+  if (set) {
+    for (const handler of set) {
+      try {
+        handler(data);
+      } catch (err) {
+        console.error(`Error in event handler for ${event}:`, err);
+      }
+    }
+  }
 };
 
 // one-time listener

@@ -2,7 +2,6 @@ import { state } from '../core/state.js';
 import { get } from '../config/storage.js';
 import { addColumn, removeColumn, addRow, removeRow, saveColumns } from '../bookmarks/layout.js';
 import { folderMoveDrop, clipTargetableId } from '../bookmarks/crud.js';
-import { renderColumns } from '../render/renderer.js';
 
 let dragIds = null;
 let dropTarget = null;

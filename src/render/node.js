@@ -1,7 +1,7 @@
 import { get } from '../config/storage.js';
 import { getIcon } from './icons.js';
 import { updateTooltips } from './tooltips.js';
-import { toggle, setGetChildrenFunctionForFolder as setFolderGetChildrenFunction } from './folder.js';
+import * as chromeApi from '../core/chrome-api.js';
 
 // Sets CSS classes for node
 export function setClass(target, node, isOpen) {
@@ -17,32 +17,33 @@ export function setClass(target, node, isOpen) {
 }
 
 // Opens given node in a tab
-function openLink(node, newtab) {
+async function openLink(node, newtab) {
   const url = node.url;
-  if (url) {
-    chrome.tabs.getCurrent((tab) => {
-      if (newtab) {
-        chrome.tabs.create({
-          url,
-          active: newtab === 1,
-          openerTabId: tab.id,
-        });
-      } else {
-        chrome.tabs.update(tab.id, { url });
-      }
-    });
+  if (!url) return;
+  try {
+    const tab = await chromeApi.getCurrentTab();
+    if (newtab) {
+      await chromeApi.createTab({
+        url,
+        active: newtab === 1,
+        openerTabId: tab.id,
+      });
+    } else {
+      await chromeApi.updateTab(tab.id, { url });
+    }
+  } catch (err) {
+    console.warn('Failed to open link:', err);
   }
 }
 
-// These will be set by shim after all modules load
 let getChildrenFunction = null;
 let getConfig = get; // default to config.get
 let addFolderHandlers = null;
 let enableDragFolder = null;
+let toggleFn = null;
 
 export function setGetChildrenFunction(fn) {
   getChildrenFunction = fn;
-  setFolderGetChildrenFunction(fn);
 }
 
 export function setGetConfig(fn) {
@@ -55,6 +56,10 @@ export function setAddFolderHandlers(fn) {
 
 export function setEnableDragFolder(fn) {
   enableDragFolder = fn;
+}
+
+export function setToggle(fn) {
+  toggleFn = fn;
 }
 
 // Render a single bookmark node

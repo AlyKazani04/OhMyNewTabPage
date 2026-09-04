@@ -2,7 +2,6 @@ import { state } from '../core/state.js';
 import { get } from '../config/storage.js';
 import { getChildrenFunction, getSubTree } from '../bookmarks/tree.js';
 import { renderAll, setGetChildrenFunction as setNodeGetChildrenFunction, setGetConfig as setNodeGetConfig } from './node.js';
-import { addColumnHandlers } from '../interaction/context-menu.js'; // Will be created in Phase 5
 
 // Render column with given index
 export function renderColumn(index, target) {
@@ -13,7 +12,7 @@ export function renderColumn(index, target) {
     getChildrenFunction({ id: ids[0] })((result) => {
       if (!state.columns[index]) return;
       renderAll(result, target);
-      if (addColumnHandlers) addColumnHandlers(index, target);
+      if (addColumnHandlersFn) addColumnHandlersFn(index, target);
     });
   } else if (ids.length > 0) {
     let i = 0;
@@ -29,14 +28,13 @@ export function renderColumn(index, target) {
       } else {
         // Render node list
         renderAll(nodes, target, true);
-        if (addColumnHandlers) addColumnHandlers(index, target);
+        if (addColumnHandlersFn) addColumnHandlersFn(index, target);
       }
     };
     getSubTree(ids[i], callback);
   }
 }
 
-// These will be set by shim after interaction module loads
 let addColumnHandlersFn = null;
 
 export function setAddColumnHandlers(fn) {

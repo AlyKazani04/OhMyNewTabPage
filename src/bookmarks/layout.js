@@ -221,7 +221,6 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
   }
 }
 
-// These will be set by shim after all modules load
 export let scheduleRestore = null;
 export let renderColumns = null;
 

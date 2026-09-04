@@ -2,7 +2,13 @@ import * as chromeApi from '../core/chrome-api.js';
 import { state, mutations } from '../core/state.js';
 import { get } from '../config/storage.js';
 import { SPECIAL, isSpecial } from './special-nodes.js';
-import { removeFromLayout, saveColumns, renderColumns, scheduleRestore } from './layout.js';
+import { removeFromLayout, saveColumns } from './layout.js';
+
+let renderColumnsFn = null;
+let scheduleRestoreFn = null;
+
+export function setRenderColumnsForCrud(fn) { renderColumnsFn = fn; }
+export function setScheduleRestoreForCrud(fn) { scheduleRestoreFn = fn; }
 
 // Check if ID is a real bookmark (numeric)
 export function isRealBookmarkId(id) {
@@ -57,10 +63,10 @@ export async function createBookmarkAt(props, afterId) {
     const result = await chromeApi.bmCreate(props);
     if (!result) {
       console.warn('create failed');
-    } else {
-      scheduleRestore(result.id);
+    } else if (scheduleRestoreFn) {
+      scheduleRestoreFn(result.id);
     }
-    renderColumns();
+    if (renderColumnsFn) renderColumnsFn();
   };
   if (!afterId) return finish(null);
   const results = await chromeApi.bmGet(afterId);
@@ -78,10 +84,10 @@ export async function updateBookmark(id, props) {
   await chromeApi.bmUpdate(id, props);
   if (chrome.runtime.lastError) {
     console.warn('edit failed:', chrome.runtime.lastError.message);
-  } else {
-    scheduleRestore(id);
+  } else if (scheduleRestoreFn) {
+    scheduleRestoreFn(id);
   }
-  renderColumns();
+  if (renderColumnsFn) renderColumnsFn();
 }
 
 // Delete bookmarks by IDs
@@ -103,8 +109,8 @@ export async function deleteBookmarksByIds(ids) {
   if (topLevel.length > 0) {
     removeFromLayout(topLevel);
     saveColumns();
-  } else {
-    renderColumns();
+  } else if (renderColumnsFn) {
+    renderColumnsFn();
   }
 }
 

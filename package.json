@@ -16,7 +16,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "esbuild src/entry.js --bundle --outfile=temp_output.js --format=iife --global-name=OMNTP",
+    "build": "esbuild src/entry.js --bundle --outfile=temp_output.js --format=iife --global-name=OMNTP --minify --sourcemap --target=chrome104",
     "dev": "npm run build -- --watch",
     "test": "echo 'Manual: Load unpacked extension in Chrome'"
   },

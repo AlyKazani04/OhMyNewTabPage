@@ -1,7 +1,8 @@
 import { get, set, loadAll, currentTheme } from './storage.js';
 import { DEFAULTS, getThemeNames } from './schema.js';
-import { emit, Events } from '../core/events.js';
+import { emit, Events, on } from '../core/events.js';
 import * as chromeApi from '../core/chrome-api.js';
+import { getAllCSS, initCssVars } from './styles.js';
 
 let settingsInitialized = false;
 
@@ -61,6 +62,9 @@ export function initSettings() {
   if (settingsInitialized) return;
   settingsInitialized = true;
 
+  // Initialize CSS custom properties
+  initCssVars();
+
   // Close button
   document.getElementById("options_close_button").onclick = () => { showOptions(false); return false; };
 
@@ -70,12 +74,14 @@ export function initSettings() {
   let activeIndex = 0;
 
   for (let i = 0; i < nav.children.length; i++) {
-    const a = nav.children[i].firstChild;
-    a.onclick = (e) => {
+    const btn = nav.children[i].firstChild;
+    btn.onclick = (e) => {
       nav.children[activeIndex].firstChild.classList.remove("current");
+      nav.children[activeIndex].firstChild.setAttribute("aria-selected", "false");
       options.getElementsByClassName("section")[activeIndex].classList.remove("current");
       activeIndex = Array.prototype.indexOf.call(nav.children, e.target.parentNode);
       nav.children[activeIndex].firstChild.classList.add("current");
+      nav.children[activeIndex].firstChild.setAttribute("aria-selected", "true");
       options.getElementsByClassName("section")[activeIndex].classList.add("current");
 
       // Advanced tab: show generated CSS
@@ -184,7 +190,13 @@ export function showConfig(key) {
 
 // Show/hide options panel
 export function showOptions(show) {
-  document.getElementById("options").style.display = show ? "block" : "none";
+  const options = document.getElementById("options");
+  const optionsButton = document.getElementById("options_button");
+  options.style.display = show ? "block" : "none";
+  options.setAttribute("aria-hidden", show ? "false" : "true");
+  if (optionsButton) {
+    optionsButton.setAttribute("aria-expanded", show ? "true" : "false");
+  }
   if (show) {
     if (!settingsInitialized) initSettings();
     for (const key of Object.keys(DEFAULTS)) showConfig(key);
@@ -196,18 +208,10 @@ export function updateOptionsPanel(key, value) {
   const input = document.getElementById("options_" + key);
   if (input) {
     const isDefault = value === (DEFAULTS[key] || (currentTheme && currentTheme[key]));
-    input.reset.style.visibility = isDefault ? "hidden" : "visible";
+    if (input.reset) input.reset.style.visibility = isDefault ? "hidden" : "visible";
     if (input.swatch) input.swatch.value = value;
   }
 }
 
-// Get all generated CSS (for export)
-export function getAllCSS() {
-  let css = "";
-  for (const key of Object.keys(DEFAULTS)) {
-    if (key === "css") continue;
-    const c = generateCSS(key, get(key));
-    if (c && c.length < 1000) css += c + "\n";
-  }
-  return css;
-}
+// Listen for config changes to update options panel
+on(Events.CONFIG_CHANGED, ({ key, value }) => updateOptionsPanel(key, value));

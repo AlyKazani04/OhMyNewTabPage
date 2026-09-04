@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>New Tab</title>
@@ -8,15 +8,17 @@
   </head>
   <body>
     <div id="main"></div>
-    <a id="options_button" title="Options" tabindex="0"></a>
-    <div id="options">
-      <a id="options_close_button" title="Close" tabindex="0">&times;</a>
-      <ul id="options_nav">
-        <li><a class="current" tabindex="0">Settings</a></li>
-        <li><a tabindex="0">Appearance</a></li>
-        <li><a tabindex="0">Import/Export</a></li>
-        <li><a tabindex="0">Advanced</a></li>
-      </ul>
+    <button id="options_button" title="Options" aria-label="Options" aria-expanded="false" aria-controls="options"></button>
+    <div id="options" aria-hidden="true">
+      <button id="options_close_button" title="Close" aria-label="Close">&times;</button>
+      <nav aria-label="Options sections">
+        <ul id="options_nav" role="tablist">
+          <li><button role="tab" class="current" aria-selected="true" tabindex="0">Settings</button></li>
+          <li><button role="tab" aria-selected="false" tabindex="0">Appearance</button></li>
+          <li><button role="tab" aria-selected="false" tabindex="0">Import/Export</button></li>
+          <li><button role="tab" aria-selected="false" tabindex="0">Advanced</button></li>
+        </ul>
+      </nav>
       <div class="section current">
         <fieldset>
           <legend>Settings</legend>
@@ -285,6 +287,5 @@
       </div>
     </div>
     <script src="temp_output.js"></script>
-    <!-- <script src="vim.js"></script> -->
   </body>
 </html>

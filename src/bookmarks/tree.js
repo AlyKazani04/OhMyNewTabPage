@@ -7,7 +7,7 @@ export function getChildrenFunction(node) {
   if (isSpecial(node.id)) {
     const specialNode = getSpecialNode(node.id);
     const load = specialNode.children;
-    return load || (() => callback([]));
+    return load || ((callback) => callback([]));
   }
   if (node.children) {
     return (callback) => callback(node.children);

@@ -1,14 +1,28 @@
 import { get } from './storage.js';
 import { on, Events } from '../core/events.js';
-
-const styles = new Map(); // key -> <style> element
+import { DEFAULTS } from './schema.js';
 
 // Scale input [0,1,2] to [min,mid,max]
 export function scale(value, mid, max, min = 0) {
   return value > 1 ? mid + (value - 1) * (max - mid) : min + value * (mid - min);
 }
 
-// Generate CSS string for a config key
+// Escape value for safe use in CSS url()
+function escapeCssUrl(value) {
+  // Validate it's a safe URL (http:, https:, data:image/)
+  if (value && !/^(https?:|data:image\/)/i.test(value.trim())) {
+    return 'none'; // Empty url for invalid values
+  }
+  // Escape quotes and backslashes
+  return 'url("' + value.replace(/["\\]/g, '\\$&') + '")';
+}
+
+// Set a CSS custom property on :root
+function setCssVar(name, value) {
+  document.documentElement.style.setProperty(name, value);
+}
+
+// Generate CSS string for a config key (for export)
 export function generateCSS(key, value) {
   switch (key) {
     case "font":
@@ -23,7 +37,7 @@ export function generateCSS(key, value) {
       return `body { background-color: ${value}; }`;
     case "background_image":
     case "background_image_file":
-      return `body { background-image: url(${value}); }`;
+      return `body { background-image: ${escapeCssUrl(value)}; }`;
     case "background_align":
       return `body { background-position: ${value}; }`;
     case "background_repeat":
@@ -65,38 +79,91 @@ export function generateCSS(key, value) {
   }
 }
 
-// Apply style to DOM
-export function applyStyle(key, css) {
-  if (!css) return removeStyle(key);
+// Apply config value as CSS custom property
+export function applyCssVar(key, value) {
+  if (value == null) value = get(key);
 
-  let style = styles.get(key);
-  if (!style) {
-    style = document.createElement("style");
-    styles.set(key, style);
-    document.head.appendChild(style);
+  switch (key) {
+    case "font":
+      setCssVar("--font-family", `"${value}"`);
+      break;
+    case "font_size":
+      setCssVar("--font-size", `${value / 10}em`);
+      break;
+    case "font_weight":
+      setCssVar("--font-weight", value);
+      break;
+    case "font_color":
+      setCssVar("--font-color", value);
+      break;
+    case "background_color":
+      setCssVar("--background-color", value);
+      break;
+    case "background_image":
+    case "background_image_file":
+      setCssVar("--background-image", escapeCssUrl(value));
+      break;
+    case "background_align":
+      setCssVar("--background-align", value);
+      break;
+    case "background_repeat":
+      setCssVar("--background-repeat", value);
+      break;
+    case "background_size":
+      setCssVar("--background-size", value);
+      break;
+    case "highlight_color":
+      setCssVar("--highlight-color", value);
+      break;
+    case "shadow_color":
+      setCssVar("--shadow-color", value);
+      break;
+    case "shadow_blur":
+      setCssVar("--shadow-blur", `${scale(value, 7, 100)}px`);
+      break;
+    case "highlight_round":
+      setCssVar("--highlight-round", `${scale(value, 0.2, 1.5)}em`);
+      break;
+    case "fade":
+      setCssVar("--fade-duration", `${scale(value, 0.2, 1)}s`);
+      break;
+    case "slide":
+      setCssVar("--slide-duration", `${scale(value, 0.2, 1)}s`);
+      break;
+    case "spacing":
+      setCssVar("--spacing-line-height", scale(value, 2, 5.6, 0.8));
+      setCssVar("--spacing-padding", `${scale(value, 0.8, 2, 0.4)}em`);
+      break;
+    case "width":
+      setCssVar("--width", get("auto_scale") ? scale(value, 80, 100, 20) + "%" : scale(value, 1000, 3000, 400) + "px");
+      break;
+    case "h_pos": {
+      const margin = 100 - scale(get("width"), 80, 100, 20);
+      setCssVar("--h-pos", `${scale(value, 0, margin / 2, -margin / 2)}%`);
+      break;
+    }
+    case "v_margin":
+      setCssVar("--v-margin", get("auto_scale") ? scale(value, 5, 20) + "%" : scale(value, 80, 600) + "px");
+      break;
+    case "auto_scale":
+      setCssVar("--auto-scale", value);
+      break;
+    case "hide_options":
+      // Handled via CSS: #options_button { opacity: var(--hide-options, 0.6); }
+      // But we need to handle 0/1 -> 0/0.6
+      setCssVar("--hide-options", value === 1 ? "0" : "0.6");
+      break;
+    case "css":
+      // Custom CSS is applied separately
+      break;
   }
-  style.textContent = css;
 }
 
-// Remove style from DOM
-export function removeStyle(key) {
-  const style = styles.get(key);
-  if (style) {
-    style.remove();
-    styles.delete(key);
-  }
-}
-
-// Handle config change: generate CSS, apply, handle dependencies
+// Handle config change: apply CSS custom property, handle dependencies
 export function onChange(key, value) {
   if (value == null) value = get(key);
 
-  const css = generateCSS(key, value);
-  if (css !== null) {
-    applyStyle(key, css);
-  } else {
-    removeStyle(key);
-  }
+  applyCssVar(key, value);
 
   // Dependent keys that need refresh
   if (key === "width") onChange("h_pos");
@@ -105,10 +172,18 @@ export function onChange(key, value) {
     onChange("width");
     onChange("v_margin");
   }
+  else if (key === "background_image_file") {
+    // background_image_file and background_image share the same CSS var
+    onChange("background_image");
+  }
+}
 
-  // Update options panel if initialized
-  if (typeof updateOptionsPanel === "function") {
-    updateOptionsPanel(key, value);
+// Initialize all CSS custom properties from current config
+export function initCssVars() {
+  for (const key of Object.keys(DEFAULTS)) {
+    if (key !== "css") {
+      applyCssVar(key, get(key));
+    }
   }
 }
 

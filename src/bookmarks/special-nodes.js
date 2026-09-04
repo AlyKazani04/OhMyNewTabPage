@@ -1,5 +1,6 @@
 import { get } from '../config/storage.js';
 import * as chromeApi from '../core/chrome-api.js';
+import { state } from '../core/state.js';
 
 // Virtual (non-bookmark) top-level entries
 export const SPECIAL = {
@@ -11,19 +12,19 @@ export const SPECIAL = {
   top: {
     label: 'Most visited',
     children: (callback) => {
-      if (chrome.topSites) {
-        chrome.topSites.get((result) => {
-          callback(result.slice(0, get('number_top')));
-        });
-      } else {
-        callback([]);
-      }
+      chromeApi.getTopSites().then(
+        (result) => callback(result.slice(0, get('number_top'))),
+        () => callback([])
+      );
     },
   },
   recent: {
     label: 'Recent bookmarks',
     children: (callback) => {
-      chrome.bookmarks.getRecent(get('number_recent'), callback);
+      chromeApi.bmGetRecent(get('number_recent')).then(
+        (result) => callback(result),
+        () => callback([])
+      );
     },
   },
   closed: {
@@ -55,8 +56,7 @@ export function isSpecial(id) {
 // Get recently closed tabs
 function getClosed(callback) {
   const maxResults = get('number_closed');
-  chrome.sessions.getRecentlyClosed(
-    { maxResults },
+  chromeApi.getRecentlyClosed(maxResults).then(
     (sessions) => {
       const nodes = [];
       for (let i = 0; i < sessions.length && i < maxResults; i++) {
@@ -71,25 +71,22 @@ function getClosed(callback) {
           url: session.tab ? session.tab.url : null,
           className: session.window ? 'window' : null,
           action: () => {
-            chrome.sessions.restore(
-              session.window ? session.window.sessionId : session.tab.sessionId,
-              () => {
-                refreshClosed();
-              }
-            );
+            chromeApi.restoreSession(
+              session.window ? session.window.sessionId : session.tab.sessionId
+            ).then(refreshClosed);
             return false;
           },
         });
       }
       callback(nodes);
-    }
+    },
+    () => callback([])
   );
 }
 
 // Get other devices
 function getDevices(callback) {
-  chrome.sessions.getDevices(
-    { maxResults: get('number_closed') },
+  chromeApi.getDevices().then(
     (devices) => {
       const nodes = [];
       for (let i = 0; i < devices.length; i++) {
@@ -112,7 +109,8 @@ function getDevices(callback) {
         });
       }
       callback(nodes);
-    }
+    },
+    () => callback([])
   );
 }
 
@@ -127,18 +125,18 @@ export function refreshClosed() {
       targets.push(a.parentNode);
     }
   }
-  if (folders.length === 0 && window.coords && window.coords['closed']) {
-    const target = document.getElementsByClassName('column')[window.coords['closed'].x];
+  if (folders.length === 0 && state.coords && state.coords['closed']) {
+    const target = document.getElementsByClassName('column')[state.coords['closed'].x];
     target.removeChild(target.firstChild);
     targets.push(target);
   }
 
-  getChildrenFunction({ id: 'closed' })( (result) => {
+  if (!getChildrenFunction || !renderAll) return;
+  getChildrenFunction({ id: 'closed' })((result) => {
     for (let i = 0; i < targets.length; i++) renderAll(result, targets[i]);
   });
 }
 
-// These will be set by the shim after all modules load
 let getChildrenFunction = null;
 let renderAll = null;
 

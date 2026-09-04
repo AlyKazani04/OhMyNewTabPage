@@ -78,60 +78,64 @@ async function getPasteDestination(below) {
 }
 
 async function pasteBatch(mode, ids, below) {
-  const dest = await getPasteDestination(below);
+  try {
+    const dest = await getPasteDestination(below);
 
-  let parentId = null; // resolved destination folder (set once known)
-  let base = null; // copy mode: static insertion index, null = append
+    let parentId = null; // resolved destination folder (set once known)
+    let base = null; // copy mode: static insertion index, null = append
 
-  if (!dest.anchorId) {
-    parentId = dest.parentId;
-  } else if (mode !== 'cut') {
-    // Copy mode inserts fresh clones at static positions relative to the anchor
-    const anc0 = await bmGet(dest.anchorId);
-    if (!anc0 || !anc0[0]) return;
-    parentId = anc0[0].parentId;
-    base = anc0[0].index + (below ? 1 : 0);
-  }
-
-  const par = parentId ? await bmGet(parentId) : null;
-  let len = par && par[0] && par[0].children ? par[0].children.length : 0;
-
-  const done = [];
-  for (let i = 0; i < ids.length; i++) {
-    if (mode === 'cut') {
-      const src = await bmGet(ids[i]);
-      if (!src || !src[0]) continue;
-      let props;
-      if (dest.anchorId) {
-        // Inserting directly above the live anchor stacks items in order;
-        // below the anchor needs the running offset to clear earlier moves
-        const anc = await bmGet(dest.anchorId);
-        if (!anc || !anc[0]) break;
-        props = {
-          parentId: anc[0].parentId,
-          index: below ? anc[0].index + 1 + i : anc[0].index,
-        };
-      } else {
-        props = { parentId: parentId, index: null };
-      }
-      if (!parentId) parentId = props.parentId;
-      const moved = await bmMove(ids[i], props);
-      if (!moved) continue;
-      done.push(moved.id);
-    } else {
-      if (!clipTargetableId(ids[i])) continue;
-      const created = await copyBookmarkSubtree(
-        ids[i],
-        parentId,
-        base == null ? null : Math.max(0, Math.min(base + i, len)),
-      );
-      if (!created) continue;
-      len++;
-      done.push(created.id);
+    if (!dest.anchorId) {
+      parentId = dest.parentId;
+    } else if (mode !== 'cut') {
+      // Copy mode inserts fresh clones at static positions relative to the anchor
+      const anc0 = await bmGet(dest.anchorId);
+      if (!anc0 || !anc0[0]) return;
+      parentId = anc0[0].parentId;
+      base = anc0[0].index + (below ? 1 : 0);
     }
-  }
 
-  mutations.clearClipboard();
-  if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
-  else updateCursorVisuals();
+    const par = parentId ? await bmGet(parentId) : null;
+    let len = par && par[0] && par[0].children ? par[0].children.length : 0;
+
+    const done = [];
+    for (let i = 0; i < ids.length; i++) {
+      if (mode === 'cut') {
+        const src = await bmGet(ids[i]);
+        if (!src || !src[0]) continue;
+        let props;
+        if (dest.anchorId) {
+          // Inserting directly above the live anchor stacks items in order;
+          // below the anchor needs the running offset to clear earlier moves
+          const anc = await bmGet(dest.anchorId);
+          if (!anc || !anc[0]) break;
+          props = {
+            parentId: anc[0].parentId,
+            index: below ? anc[0].index + 1 + i : anc[0].index,
+          };
+        } else {
+          props = { parentId: parentId, index: null };
+        }
+        if (!parentId) parentId = props.parentId;
+        const moved = await bmMove(ids[i], props);
+        if (!moved) continue;
+        done.push(moved.id);
+      } else {
+        if (!clipTargetableId(ids[i])) continue;
+        const created = await copyBookmarkSubtree(
+          ids[i],
+          parentId,
+          base == null ? null : Math.max(0, Math.min(base + i, len)),
+        );
+        if (!created) continue;
+        len++;
+        done.push(created.id);
+      }
+    }
+
+    mutations.clearClipboard();
+    if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
+    else updateCursorVisuals();
+  } catch (e) {
+    console.error("Error: ", e);
+  }
 }

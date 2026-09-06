@@ -1,7 +1,7 @@
 {
   "name": "Oh My New Tab Page",
   "short_name": "OMNTP",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minimum_chrome_version": "104",
   "manifest_version": 3,
   "description": "A lightning-fast, keyboard-centric new tab page for power users. This project is a feature-rich fork of the Humble New Tab Page extension, with added functionalities and optimized for productivity.",
@@ -15,7 +15,6 @@
     "bookmarks",
     "favicon",
     "topSites",
-    "tabs",
     "fontSettings",
     "sessions"
   ],

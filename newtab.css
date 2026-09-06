@@ -1,7 +1,37 @@
+:root {
+  /* Theme colors */
+  --font-family: "Sans-serif";
+  --font-size: 1.6em;
+  --font-weight: 400;
+  --font-color: #555555;
+  --background-color: #ffffff;
+  --highlight-color: #e4f4ff;
+  --highlight-font-color: #000000;
+  --shadow-color: #57b0ff;
+  --shadow-blur: 7px;
+  --highlight-round: 0.2em;
+  --fade-duration: 0.2s;
+  --slide-duration: 0.2s;
+  --spacing-line-height: 2;
+  --spacing-padding: 0.8em;
+  --width: 80%;
+  --h-pos: 0%;
+  --v-margin: 5%;
+  --auto-scale: 1;
+  --background-image: none;
+  --background-align: left top;
+  --background-repeat: repeat;
+  --background-size: auto;
+  --hide-options: 0;
+}
+
 body {
-  background-color: #fff;
+  background-color: var(--background-color);
+  background-image: var(--background-image);
   background-attachment: fixed;
-  background-position: left top;
+  background-position: var(--background-align);
+  background-repeat: var(--background-repeat);
+  background-size: var(--background-size);
   width: 100vw;
   margin: 0 auto;
   overflow-x: hidden;
@@ -10,12 +40,13 @@ body {
   line-height: 1;
 }
 #main {
-  width: 80%;
-  margin: 5% auto 0;
+  width: var(--width);
+  margin: var(--v-margin) auto 0;
   position: relative;
   max-width: 100%;
   white-space: nowrap;
   user-select: none;
+  left: var(--h-pos);
 }
 #main ul,
 .menu {
@@ -33,15 +64,21 @@ body {
   display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 1.6em;
-  line-height: 2;
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  font-weight: var(--font-weight);
+  line-height: var(--spacing-line-height);
   text-decoration: none;
-  color: #555;
-  padding: 0 0.8em;
+  color: var(--font-color);
+  padding: 0 var(--spacing-padding);
   cursor: pointer;
-  transition-property: color, background-color, box-shadow, opacity;
-  transition-duration: 0.2s;
+  transition-property: color, background-color, opacity;
+  transition-duration: var(--fade-duration);
   transition-timing-function: ease-out;
+}
+#main a:hover {
+  color: var(--highlight-color);
+  box-shadow: 0 0 var(--shadow-blur) var(--shadow-color);
 }
 .icon {
   display: inline-block;
@@ -59,9 +96,19 @@ body {
   margin-left: -2px;
 }
 .wrap {
-  transition-property: height, opacity;
-  transition-duration: 0.2s;
+  transition-property: transform, opacity;
+  transition-duration: var(--slide-duration);
   transition-timing-function: ease-out;
+  transform-origin: top;
+}
+.wrap.closing {
+  transform: scaleY(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.wrap.opening {
+  transform: scaleY(1);
+  opacity: 1;
 }
 .column {
   display: inline-block;
@@ -230,20 +277,24 @@ body {
   padding: 0;
   border-right: solid 1px #ccc;
 }
-#options_nav a {
+#options_nav button {
   display: block;
+  width: 100%;
   padding: 1em 2em;
   text-decoration: none;
   color: inherit;
   border: solid transparent;
   border-width: 1px 0;
   cursor: pointer;
+  background: none;
+  font: inherit;
+  text-align: left;
 }
-#options_nav a:hover {
+#options_nav button:hover {
   background-color: #e4f4ff;
   outline: solid thin #57b0ff;
 }
-#options_nav a.current {
+#options_nav button.current {
   color: #000;
   background-color: #fafafa;
   border-color: #ccc;
@@ -266,6 +317,8 @@ body {
   height: 32px;
   opacity: 0.6;
   cursor: pointer;
+  border: none;
+  padding: 0;
 }
 #options_button:hover {
   opacity: 1;
@@ -273,7 +326,6 @@ body {
 #options_close_button {
   color: #000;
   text-align: center;
-  text-decoration: none;
   font-size: 1.4em;
   position: absolute;
   top: 0;
@@ -283,6 +335,9 @@ body {
   height: 32px;
   line-height: 32px;
   cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
 }
 legend {
   color: #888;
@@ -417,4 +472,104 @@ input[type="file"]::-webkit-file-upload-button {
     url("icons/options.png") 1x,
     url("icons/options@2x.png") 2x
   );
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  :root {
+    --width: 90%;
+    --font-size: 1.5em;
+    --spacing-padding: 0.6em;
+  }
+  .column {
+    min-height: 250px;
+    padding: 8px 0 16px 0;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --width: 95%;
+    --font-size: 1.4em;
+    --spacing-padding: 0.5em;
+    --v-margin: 3%;
+  }
+  .column {
+    min-height: 200px;
+    padding: 6px 0 12px 0;
+  }
+  #options {
+    min-width: 28em;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --width: 100%;
+    --font-size: 1.3em;
+    --spacing-padding: 0.4em;
+    --v-margin: 2%;
+    --h-pos: 0%;
+  }
+  body {
+    overflow-x: auto;
+  }
+  #main {
+    left: 0;
+    white-space: normal;
+  }
+  .column {
+    display: block;
+    width: 100%;
+    min-height: auto;
+    padding: 4px 0 8px 0;
+    border-bottom: 1px solid var(--shadow-color);
+  }
+  .column:last-child {
+    border-bottom: none;
+  }
+  #options {
+    min-width: 100%;
+    left: 0;
+    right: 0;
+    border-radius: 0;
+  }
+  #options_nav {
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: solid 1px #ccc;
+    display: flex;
+  }
+  #options_nav li {
+    flex: 1;
+  }
+  #options_nav button {
+    padding: 0.8em 1em;
+    font-size: 0.9em;
+    text-align: center;
+  }
+  #options .section {
+    margin-left: 0;
+    margin-top: 0;
+  }
+  #options_button {
+    top: auto;
+    bottom: 0;
+    right: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  :root {
+    --font-size: 1.2em;
+    --spacing-padding: 0.3em;
+  }
+  #main a {
+    padding: 0 var(--spacing-padding);
+  }
+  .menu {
+    font-size: 1em;
+  }
 }

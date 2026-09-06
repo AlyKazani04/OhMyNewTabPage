@@ -45,7 +45,7 @@ export function generateCSS(key, value) {
     case "background_size":
       return `body { background-size: ${value}; }`;
     case "highlight_font_color":
-      return ""; // handled via highlight_color TODO: See what's up with this, remove if useless
+      return ""; // part of themes; no standalone rule (text color is driven by --highlight-color)
     case "highlight_color":
       return `#main a:hover { color: ${value}; } #main a.vim-cursor { outline-color: ${value}; } .menu a:hover, .menu a:focus-visible { color: ${value}; }`;
     case "shadow_color":

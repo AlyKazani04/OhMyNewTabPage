@@ -2,42 +2,52 @@
 
 ## Project Overview
 
-Chrome extension (MV3) replacing new tab page. Vim-style keyboard navigation, multi-column bookmark layout, theming, drag-drop reorganization. Fork of Humble New Tab Page.
+Chrome extension (MV3) replacing the new tab page. Vim-style keyboard navigation, multi-column bookmark layout, theming, drag-drop reorganization. Fork of Humble New Tab Page.
 
-## Current Architecture (Monolithic)
+## Architecture (Modular — post-migration)
 
 ```
-├── newtab.js      # 1,751 lines — rendering, state, config, bookmarks, UI
-├── vim.js         # 965 lines — vim navigation, CRUD, clipboard, theme picker
-├── newtab.html    # 290 lines — HTML + inline options panel
-├── newtab.css     # 420 lines — styles
-└── manifest.json  # Chrome extension manifest v3
+newtab.html          # UI shell + options panel; loads the bundled temp_output.js
+manifest.json        # Chrome extension manifest v3
+src/
+├── entry.js         # Boot + dependency-injection wiring + event listeners
+├── core/            # state.js, events.js, chrome-api.js (promise wrappers)
+├── config/          # schema.js, storage.js, styles.js, ui.js
+├── bookmarks/       # special-nodes.js, tree.js, crud.js, layout.js
+├── render/          # renderer.js, column.js, node.js, folder.js, icons.js, tooltips.js
+├── interaction/     # context-menu.js, drag-drop.js, keyboard.js, modal.js
+└── vim/             # cursor.js, selection.js, actions.js, observer.js
 ```
 
-## Key Patterns (Current)
+The `index.js` in each folder re-exports its modules. `newtab.html` does NOT load `src/` — it loads the **esbuild bundle** `temp_output.js` produced from `src/entry.js`. See Development Workflow.
 
-- **State**: Global variables in `newtab.js` (`columns`, `root`, `coords`, `special`, `config`, `themes`, `theme`) and `vim.js` (`vimCursor`, `vimEl`, `vimSelected`, `clipboard`, `vimPendingRestore`)
-- **Coupling**: `vim.js` depends on 15+ globals from `newtab.js` — no module boundaries
-- **Chrome APIs**: Called directly via callbacks (`chrome.bookmarks.getSubTree`, `chrome.sessions.getRecentlyClosed`, etc.) — not promise-wrapped
-- **Rendering**: Functions mutate DOM directly, mixed with business logic
-- **Config**: `config` object + `themes` object in `newtab.js`; `getConfig()`/`setConfig()` read/write `localStorage` with `options.` prefix
-- **Events**: None — direct function calls and global mutation
+## Key Patterns
+
+- **State**: Single source of truth in `core/state.js` (`state.columns`, `state.root`, `state.coords`, `state.vim*`); mutated only via `mutations` / read via `getters`.
+- **Events**: `core/events.js` — `on(event, handler)` / `emit(event, data)`. Standard events live in `Events` (e.g. `RENDER_REQUESTED`, `CONFIG_CHANGED`, `COLUMNS_CHANGED`); a custom `'bookmarks:visibility'` event carries `{ id, visible }`.
+- **Dependency injection**: Most cross-module deps are set by `src/entry.js` via setters (`render.setGetChildrenFunction(...)`, `bookmarks.setRenderColumnsForCrud(...)`, etc.). Module-private function slots default to `null` and are null-guarded.
+- **Boot sequence** (`src/entry.js`): module imports run first (side effects + DI setters), then `loadAll()` (config), `initKeyboard()`, `?options` handling, event listeners, `window.*` exports, and finally `loadColumns()` — which fetches the bookmarks root, builds the column grid and emits `RENDER_REQUESTED` → `renderColumns()`.
+- **Chrome APIs**: Promise-wrapped in `core/chrome-api.js` (callback style under the hood). Never call `chrome.*` directly in feature modules.
+- **Config**: `config/schema.js` defines `DEFAULTS`/`THEMES`/`validate`; `config/storage.js` `get`/`set`/`loadAll` read/write `localStorage` under the `options.` prefix. `set()` re-emits layout-affecting changes: `lock`/`newtab`/`show_root`/`number_*` → `COLUMNS_CHANGED`; `show_*` → `'bookmarks:visibility'`. Both are consumed in `bookmarks/layout.js` (reload grid / add-or-remove row).
+- **Rendering**: Pure-ish render functions receive `state` and produce DOM; cross-cutting styling is applied via CSS custom properties set in `config/styles.js`.
 
 ## Development Workflow
 
-1. **Build**: None (raw JS loaded directly via `newtab.html`)
-2. **Test**: Load project root as unpacked extension in Chrome
-3. **Verify**: Manual checklist below
+1. **Build**: `npm run build` (esbuild bundles `src/entry.js` → `temp_output.js`). Use `npm run dev` for watch mode.
+2. **Edit**: Modify files under `src/`. **Always rebuild before testing** — `newtab.html` runs `temp_output.js`, not the `src/` sources, so a stale bundle shows old (or broken) behavior.
+3. **Test**: Load the **project root** as an unpacked extension in Chrome (`chrome://extensions` → Load unpacked).
+4. **Verify**: Manual checklist below.
 
-## Common Tasks (Current)
+## Common Tasks
 
-| Task              | Location                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| Add config option | `newtab.js` — `config` object, `getConfig`/`setConfig`, `getStyle`, `initConfig`, `initSettings` |
-| Add vim command   | `vim.js` — key handler switch + action function                                                  |
-| Add special node  | `newtab.js` — `SPECIAL` object + `getChildrenFunction`                                           |
-| Change rendering  | `newtab.js` — `render`, `renderAll`, `renderColumn`, `renderColumns`                             |
-| Modify drag-drop  | `newtab.js` — `enableDragColumn`, `enableDragFolder`, `enableDragDrop`                           |
+| Task              | Location                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| Add config option | `config/schema.js` (`DEFAULTS`) → `config/ui.js` (input) → `config/styles.js` (css vars)     |
+| Add vim command   | `vim/actions.js` → `interaction/keyboard.js` key handler                                     |
+| Add special node  | `bookmarks/special-nodes.js` (`SPECIAL`) + `bookmarks/tree.js` handling                      |
+| Change rendering  | `render/renderer.js`, `render/column.js`, `render/node.js`, `render/folder.js`               |
+| Modify drag-drop  | `interaction/drag-drop.js`                                                                   |
+| Wire module dep   | `src/entry.js` (setter calls)                                                               |
 
 ## Chrome API Permissions (manifest.json)
 
@@ -48,16 +58,17 @@ Chrome extension (MV3) replacing new tab page. Vim-style keyboard navigation, mu
 - `fontSettings` — font picker in options
 - `sessions` — recently closed, other devices
 
-## Gotchas (Current)
+## Gotchas
 
-- `chrome.bookmarks.getSubTree` returns `[{ children: [...] }]` — unwrap carefully
-- `chrome.sessions.getRecentlyClosed` returns windows/tabs mixed — normalized in `getDevices`/`getClosed`
-- Favicon service: `/_favicon/?pageUrl=<url>&size=16` (Chrome internal)
-- MutationObserver on `#main` triggers `vim.js:resolveCursor()` after render
-- `localStorage` keys prefixed with `options.` and `column.X.Y`
-- Single-folder columns with `show_root: false` flatten children — handled in `vim.js:syncLayoutAfterPaste()`
-- **No build step** — edit files directly, reload extension to test
-- **Global namespace pollution** — all functions/variables on `window`
+- `chrome.bookmarks.getSubTree` returns `[{ node-with-children }]` — unwrap carefully. `getChildrenFunction` returns children; `getSubTree` returns the node list.
+- **A stale `temp_output.js` is the #1 cause of "my change did nothing" / "bookmarks don't load"** — rebuild after any `src/` edit.
+- Boot requires `loadColumns()` (runs last in `src/entry.js`); without it nothing renders.
+- `chrome.sessions.getRecentlyClosed` returns windows/tabs mixed — normalized in `bookmarks/special-nodes.js`.
+- Favicon service: `/_favicon/?pageUrl=<url>&size=16` (Chrome internal).
+- MutationObserver on `#main` triggers `vim/cursor.js:resolveCursor()` after render.
+- `localStorage` keys prefixed with `options.` and `column.X.Y`.
+- Single-folder columns with `show_root: false` flatten children — handled in `bookmarks/layout.js:syncLayoutAfterPaste()`.
+- `events.js` swallows handler errors (logs via `console.error`) — an exception in one listener won't break others.
 
 ## Testing Checklist (Manual)
 
@@ -69,11 +80,11 @@ Chrome extension (MV3) replacing new tab page. Vim-style keyboard navigation, mu
 - [ ] Selection + clipboard (yank, cut, paste)
 - [ ] Create/edit/delete via vim keys
 - [ ] Theme picker (T) switches themes
-- [ ] Options panel (/) all settings work
+- [ ] Options panel (/) all settings work; toggling content visibility adds/removes columns
 - [ ] Settings persist across reloads
 - [ ] Import/export settings
 - [ ] Recently closed refreshes on session change
 
 ## Migration Context
 
-See `docs/migration-plan.md` for 6-phase modularization plan. Target architecture documented in `docs/AGENTS-post-migration.md`.
+Modularization is complete (see `docs/migration-plan.md` for the historical phase breakdown). Migration history and the pre-migration design live in `docs/`.

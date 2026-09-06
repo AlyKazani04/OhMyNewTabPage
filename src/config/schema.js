@@ -54,6 +54,7 @@ export const THEMES = {
   "Matte Black": { font_color: "#bebebe", background_color: "#121212", highlight_color: "#e68e0d", highlight_font_color: "#121212", shadow_color: "#0d0d0d" },
   "Osaka Jade": { font_color: "#C1C497", background_color: "#111c18", highlight_color: "#509475", highlight_font_color: "#111c18", shadow_color: "#0c1512" },
   "Nord Light": { font_color: "#2e3440", background_color: "#eceff4", highlight_color: "#5e81ac", highlight_font_color: "#eceff4", shadow_color: "#d8dee9" },
+  Solitude: { font_color: "#cacccc", background_color: "#101315", highlight_color: "#798186", highlight_font_color: "#101315", shadow_color: "#0c0e10" },
 };
 
 // Validation: returns normalized value or throws

@@ -3,10 +3,16 @@ import { get } from '../config/storage.js';
 import { SPECIAL, specialKeys, isSpecial } from './special-nodes.js';
 import { getChildrenFunction } from './tree.js';
 import * as chromeApi from '../core/chrome-api.js';
-import { emit, Events } from '../core/events.js';
+import { emit, Events, on } from '../core/events.js';
 
 // Initialize SPECIAL in state
 mutations.setSpecial(SPECIAL);
+
+// True unless the node was explicitly hidden (show_<id> stored as 0 or false)
+function isNodeShown(id) {
+  const value = get('show_' + id);
+  return !(value === 0 || value === false);
+}
 
 // Ensure root folders are included
 export function verifyColumns() {
@@ -14,7 +20,7 @@ export function verifyColumns() {
   if (state.columns.length === 0) {
     state.columns.push([]);
     state.columns.push(
-      specialKeys.filter(a => get('show_' + a) !== false)
+      specialKeys.filter(a => isNodeShown(a))
     );
   }
 
@@ -30,7 +36,7 @@ export function verifyColumns() {
   // Add missing root items
   const column = state.columns[0];
   for (let i = 0; i < missing.length; i++) {
-    if (get('show_' + missing[i]) !== false) column.push(missing[i]);
+    if (isNodeShown(missing[i])) column.push(missing[i]);
   }
 
   // Populate coordinate map
@@ -226,3 +232,19 @@ export let renderColumns = null;
 
 export function setScheduleRestore(fn) { scheduleRestore = fn; }
 export function setRenderColumns(fn) { renderColumns = fn; }
+
+// Reload and re-render the layout when a layout-affecting config key changes
+// (lock, newtab, show_root, number_* — see config/storage.js).
+on(Events.COLUMNS_CHANGED, loadColumns);
+
+// Show/hide a special node or top-level bookmark folder from the grid.
+// Mirrors the legacy setConfig "show_*" handling: hiding removes the row,
+// showing lets verifyColumns restore it (respecting its show_<id> config).
+on('bookmarks:visibility', ({ id, visible }) => {
+  const pos = state.coords[id];
+  if (!visible) {
+    if (pos) removeRow(pos.x, pos.y);
+  } else if (!inColumns(id)) {
+    saveColumns();
+  }
+});

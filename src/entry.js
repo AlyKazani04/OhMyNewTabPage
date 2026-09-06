@@ -14,6 +14,7 @@ import * as core from './core/index.js';
 import { emit, Events, on } from './core/events.js';
 import { loadAll } from './config/storage.js';
 import { initKeyboard } from './interaction/keyboard.js';
+import { loadColumns } from './bookmarks/layout.js';
 
 // Wire up cross-module dependencies
 // bookmarks/special-nodes.js needs getChildrenFunction and renderAll
@@ -53,9 +54,8 @@ interaction.setShowOptions(config.showOptions);
 bookmarks.setRenderColumnsForCrud(render.renderColumns);
 bookmarks.setScheduleRestoreForCrud(bookmarks.scheduleRestore); // from layout.js via bookmarks
 
-// bookmarks/layout.js needs scheduleRestore, renderColumns
-// scheduleRestore is set by vim module directly (vim/actions.js imports from layout.js)
-// renderColumns is already set via bookmarks.setRenderColumns (layout.js version)
+// bookmarks/layout.js exposes scheduleRestore/renderColumns as settable bindings,
+// consumed by crud.js and vim/* modules.
 
 // Initialize config and keyboard
 loadAll();
@@ -71,7 +71,7 @@ on(Events.RENDER_REQUESTED, () => {
   if (window.renderColumns) window.renderColumns();
 });
 
-// Export key functions to window for any remaining legacy code
+// Publish module functions on window (consumed by event handlers and legacy global callers)
 window.renderColumns = render.renderColumns;
 window.toggle = render.toggle;
 window.getConfig = config.get;
@@ -92,3 +92,7 @@ window.showConfig = config.showConfig;
 window.onChange = config.onChange;
 window.getStyle = config.generateCSS;
 window.scale = config.scale;
+
+// Kick off the initial layout load (fetches the bookmarks root, builds columns, renders).
+// Runs last so the RENDER_REQUESTED listener and window.renderColumns above are ready.
+loadColumns();

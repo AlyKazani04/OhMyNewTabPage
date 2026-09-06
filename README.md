@@ -26,7 +26,7 @@ A lightning-fast, keyboard-centric new tab page for power users. This project is
 
 ## Themes
 
-OhMyNewTabPage ships with 13 built-in themes, with inspiration taken from [Omarchy](https://omarchy.org/) — color values are drawn from its theme collection. **Nord** is the default.
+OhMyNewTabPage ships with 14 built-in themes, with inspiration taken from [Omarchy](https://omarchy.org/) — color values are drawn from its theme collection. **Nord** is the default.
 
 | Dark             | Light            |
 | :--------------- | :--------------- |
@@ -39,6 +39,7 @@ OhMyNewTabPage ships with 13 built-in themes, with inspiration taken from [Omarc
 | Hackerman        |                  |
 | Matte Black      |                  |
 | Osaka Jade       |                  |
+| Solitude         |                  |
 
 Press `T` to open the keyboard-accessible theme picker, or pick a theme in the options panel (`/`).
 

@@ -39,7 +39,7 @@ export const DEFAULTS = {
   number_recent: 10,
 };
 
-// Theme definitions (13 themes)
+// Theme definitions (14 themes)
 export const THEMES = {
   Nord: { font_color: "#d8dee9", background_color: "#2e3440", highlight_color: "#81a1c1", highlight_font_color: "#2e3440", shadow_color: "#222730" },
   Catppuccin: { font_color: "#cdd6f4", background_color: "#1e1e2e", highlight_color: "#89b4fa", highlight_font_color: "#1e1e2e", shadow_color: "#161622" },

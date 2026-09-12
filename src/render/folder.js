@@ -65,13 +65,15 @@ export function animate(node, anchor, isOpen) {
   // Use CSS transform-based animation
   wrap.className = 'wrap';
   wrap.style.transformOrigin = 'top';
-  
+
   if (isOpen) {
     // Closing: scale from 1 to 0
     wrap.classList.add('closing');
     wrap.classList.remove('opening');
   } else {
-    // Opening: scale from 0 to 1
+    // Opening: start squashed, then transition to expanded
+    wrap.classList.add('closing');
+    void wrap.offsetHeight; // Force recalculation to register scaleY(0)
     wrap.classList.add('opening');
     wrap.classList.remove('closing');
   }

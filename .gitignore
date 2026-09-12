@@ -1,7 +1,14 @@
+# release zips and folder
 OhMyNewTabPage_v*
 
+# dependancies folder
 node_modules
 
+# output file(s) (generated)
 temp_output.js*
 
+# temp release build folder
 release
+
+# oh-my-opencode-slim's deepwork progress files
+.slim/deepwork/

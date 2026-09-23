@@ -1,5 +1,6 @@
 import { state, mutations } from '../core/state.js';
 import { get } from '../config/storage.js';
+import { DEFAULTS } from '../config/schema.js';
 import { SPECIAL, specialKeys, isSpecial } from './special-nodes.js';
 import { getChildrenFunction } from './tree.js';
 import * as chromeApi from '../core/chrome-api.js';
@@ -8,10 +9,19 @@ import { emit, Events, on } from '../core/events.js';
 // Initialize SPECIAL in state
 mutations.setSpecial(SPECIAL);
 
-// True unless the node was explicitly hidden (show_<id> stored as 0 or false)
+// True unless the node was explicitly hidden (show_<id> stored as 0 or false).
+// For dynamic bookmark node ids (e.g. "2" for Other Bookmarks) that aren't in
+// DEFAULTS yet, read localStorage directly to respect any stored user preference
+// while avoiding the validate() throw on unknown keys.
 function isNodeShown(id) {
-  const value = get('show_' + id);
-  return !(value === 0 || value === false);
+  const key = 'show_' + id;
+  if (key in DEFAULTS) {
+    const value = get(key);
+    return !(value === 0 || value === false);
+  }
+  const raw = localStorage.getItem('options.' + key);
+  if (raw != null) return !(raw === '0' || raw === 'false');
+  return true;
 }
 
 // Ensure root folders are included

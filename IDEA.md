@@ -1,1 +1,0 @@
-A keyboard-focused browser extension built to transform the new tab page experience on Chrome. Built with vim-style bindings and pre-built themes. This Hermes project is for debugging issues and making new features.

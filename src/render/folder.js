@@ -84,7 +84,7 @@ export function animate(node, anchor, isOpen) {
     if (isOpen) {
       anchor.parentNode.removeChild(wrap);
     } else {
-      wrap.className = null;
+      wrap.className = '';
       wrap.removeAttribute('style');
     }
   }, duration);

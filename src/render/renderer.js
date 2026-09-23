@@ -12,7 +12,6 @@ export function renderColumns() {
     const column = document.createElement('div');
     column.className = 'column';
 
-    if (!state.columns.length) return;
     column.style.width = (1 / state.columns.length) * 100 + '%';
 
     // Enable drag and drop

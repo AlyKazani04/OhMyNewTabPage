@@ -7,6 +7,9 @@ node_modules
 # output file(s) (generated)
 temp_output.js*
 
+# temp working directory (local notes, scratch files — never commit)
+temp/
+
 # temp release build folder
 release
 

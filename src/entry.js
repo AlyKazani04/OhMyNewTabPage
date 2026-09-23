@@ -21,6 +21,8 @@ import { loadColumns } from './bookmarks/layout.js';
 bookmarks.setGetChildrenFunction(bookmarks.getChildrenFunction);
 bookmarks.setRenderAll(render.renderAll);
 
+bookmarks.setRemoveRow(bookmarks.removeRow);
+
 // render/node.js needs getChildrenFunction, getConfig, addFolderHandlers, enableDragFolder, toggle
 render.setGetChildrenFunction(bookmarks.getChildrenFunction);
 render.setGetConfig(config.get);
@@ -52,7 +54,7 @@ interaction.setShowOptions(config.showOptions);
 
 // bookmarks/crud.js needs renderColumns, scheduleRestore
 bookmarks.setRenderColumnsForCrud(render.renderColumns);
-bookmarks.setScheduleRestoreForCrud(bookmarks.scheduleRestore); // from layout.js via bookmarks
+bookmarks.setScheduleRestoreForCrud(vim.scheduleRestore); // from layout.js via bookmarks
 
 // bookmarks/layout.js exposes scheduleRestore/renderColumns as settable bindings,
 // consumed by crud.js and vim/* modules.

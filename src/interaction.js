@@ -16,10 +16,8 @@ import {
 } from './vim/index.js';
 import { state } from './state.js';
 import { get } from './config/config.js';
-import { addColumn, removeColumn, addRow, removeRow } from './bookmarks/layout.js';
+import { folderMoveDrop, addColumn, removeColumn, addRow, removeRow } from './bookmarks.js';
 import * as chromeApi from './chrome-api.js';
-import { folderMoveDrop } from './bookmarks/crud.js';
-
 
 
 // Keyboard handler

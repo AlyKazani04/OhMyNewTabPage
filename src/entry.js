@@ -1,24 +1,18 @@
 import './events.js';
-import './state.js';
-import './bookmarks/index.js';
 import './render/index.js';
 import './vim/index.js';
 
-import * as bookmarks from './bookmarks/index.js';
+import * as bookmarks from './bookmarks.js';
 import * as render from './render/index.js';
 import * as interaction from './interaction.js';
 import * as vim from './vim/index.js';
 import * as config from './config/index.js';
 import { Events, on } from './events.js';
 import * as core from './state.js';
-import { loadColumns } from './bookmarks/layout.js';
 
 // Wire up cross-module dependencies
 // bookmarks/special-nodes.js needs getChildrenFunction and renderAll
-bookmarks.setGetChildrenFunction(bookmarks.getChildrenFunction);
 bookmarks.setRenderAll(render.renderAll);
-
-bookmarks.setRemoveRow(bookmarks.removeRow);
 
 // render/node.js needs getChildrenFunction, getConfig, addFolderHandlers, enableDragFolder, toggle
 render.setGetChildrenFunction(bookmarks.getChildrenFunction);
@@ -94,4 +88,4 @@ window.scale = config.scale;
 
 // Kick off the initial layout load (fetches the bookmarks root, builds columns, renders).
 // Runs last so the RENDER_REQUESTED listener and window.renderColumns above are ready.
-loadColumns();
+bookmarks.loadColumns();

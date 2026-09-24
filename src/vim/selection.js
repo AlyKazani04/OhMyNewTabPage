@@ -1,8 +1,6 @@
 import { state, mutations } from '../state.js';
 import { bmGet, bmMove } from '../chrome-api.js';
-import { isRealBookmarkId, normalizeUrl, getDefaultParentId, findParentFolderId, getInsertionContext, copyBookmarkSubtree, clipTargetableId } from '../bookmarks/crud.js';
-import { removeFromLayout, saveColumns, placeInLayout, syncLayoutAfterPaste, isShowRootEnabled } from '../bookmarks/layout.js';
-import { scheduleRestore } from '../bookmarks/layout.js';
+import { syncLayoutAfterPaste, getDefaultParentId, findParentFolderId, copyBookmarkSubtree, clipTargetableId } from '../bookmarks.js';
 import { updateCursorVisuals } from './cursor.js';
 
 // Re-export clipTargetableId from bookmarks/crud.js

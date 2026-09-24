@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { get } from '../config/config.js';
-import { getChildrenFunction, getSubTree } from '../bookmarks/tree.js';
+import { getChildrenFunction, getSubTree } from '../bookmarks.js';
 import { renderAll, setGetChildrenFunction as setNodeGetChildrenFunction, setGetConfig as setNodeGetConfig } from './node.js';
 
 // Render column with given index

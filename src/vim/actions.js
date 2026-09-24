@@ -1,8 +1,7 @@
 import { state } from '../state.js';
 import { get, set } from '../config/index.js';
-import { isRealBookmarkId, normalizeUrl, getDefaultParentId, findParentFolderId, getInsertionContext, createBookmarkAt, updateBookmark, deleteBookmarksByIds, clipTargetableId } from '../bookmarks/crud.js';
+import { isRealBookmarkId, normalizeUrl, getInsertionContext, createBookmarkAt, updateBookmark, deleteBookmarksByIds } from '../bookmarks.js';
 import { vimGetTargetIds } from './selection.js';
-import { scheduleRestore } from '../bookmarks/layout.js';
 import { toggle } from '../render/folder.js';
 import { showModal } from '../interaction.js';
 import { renderMenu } from '../interaction.js';

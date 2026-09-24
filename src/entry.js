@@ -2,17 +2,15 @@ import './events.js';
 import './state.js';
 import './bookmarks/index.js';
 import './render/index.js';
-import './interaction/index.js';
 import './vim/index.js';
 
 import * as bookmarks from './bookmarks/index.js';
 import * as render from './render/index.js';
-import * as interaction from './interaction/index.js';
+import * as interaction from './interaction.js';
 import * as vim from './vim/index.js';
 import * as config from './config/index.js';
-import { emit, Events, on } from './events.js';
+import { Events, on } from './events.js';
 import * as core from './state.js';
-import { initKeyboard } from './interaction/keyboard.js';
 import { loadColumns } from './bookmarks/layout.js';
 
 // Wire up cross-module dependencies

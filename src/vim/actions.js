@@ -1,11 +1,11 @@
-import { state, mutations } from '../state.js';
+import { state } from '../state.js';
 import { get, set } from '../config/index.js';
 import { isRealBookmarkId, normalizeUrl, getDefaultParentId, findParentFolderId, getInsertionContext, createBookmarkAt, updateBookmark, deleteBookmarksByIds, clipTargetableId } from '../bookmarks/crud.js';
 import { vimGetTargetIds } from './selection.js';
 import { scheduleRestore } from '../bookmarks/layout.js';
 import { toggle } from '../render/folder.js';
-import { showModal } from '../interaction/modal.js';
-import { renderMenu } from '../interaction/context-menu.js';
+import { showModal } from '../interaction.js';
+import { renderMenu } from '../interaction.js';
 import { renderColumns } from '../render/renderer.js';
 import { updateCursorVisuals } from './cursor.js';
 

@@ -1,7 +1,7 @@
-import { state } from '../core/state.js';
+import { state } from '../state.js';
 import { get } from '../config/storage.js';
 import { addColumn, removeColumn, addRow, removeRow, saveColumns } from '../bookmarks/layout.js';
-import * as chromeApi from '../core/chrome-api.js';
+import * as chromeApi from '../chrome-api.js';
 
 // Wraps click handler for menu items
 function onMenuClick(item, ul) {

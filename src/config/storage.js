@@ -1,5 +1,5 @@
 import { DEFAULTS, THEMES, validate } from './schema.js';
-import { emit, Events } from '../core/events.js';
+import { emit, Events } from '../events.js';
 
 const PREFIX = "options.";
 

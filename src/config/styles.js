@@ -1,5 +1,5 @@
 import { get } from './storage.js';
-import { on, Events } from '../core/events.js';
+import { on, Events } from '../events.js';
 import { DEFAULTS } from './schema.js';
 
 // Scale input [0,1,2] to [min,mid,max]

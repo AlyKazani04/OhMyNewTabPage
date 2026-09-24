@@ -1,5 +1,5 @@
-import { state } from '../core/state.js';
-import { emit, Events } from '../core/events.js';
+import { state } from '../state.js';
+import { emit, Events } from '../events.js';
 
 // Render all columns to main div
 export function renderColumns() {

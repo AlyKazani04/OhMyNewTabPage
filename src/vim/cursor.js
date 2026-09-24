@@ -1,5 +1,5 @@
-import { state, mutations } from '../core/state.js';
-import { emit, Events } from '../core/events.js';
+import { state, mutations } from '../state.js';
+import { emit, Events } from '../events.js';
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));

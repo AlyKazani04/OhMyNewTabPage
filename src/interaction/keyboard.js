@@ -1,13 +1,13 @@
-import { state, mutations } from '../core/state.js';
+import { state, mutations } from '../state.js';
 import { get, set } from '../config/storage.js';
-import { emit, Events } from '../core/events.js';
+import { emit, Events } from '../events.js';
 import { showModal } from './modal.js';
 import { renderMenu } from './context-menu.js';
-import { 
-  moveCursor, 
-  resolveCursor, 
-  updateCursorVisuals, 
-  scheduleRestore, 
+import {
+  moveCursor,
+  resolveCursor,
+  updateCursorVisuals,
+  scheduleRestore,
   restoreCursor,
   vimActivate,
   vimOpenFolder,

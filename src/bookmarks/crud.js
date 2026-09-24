@@ -1,5 +1,5 @@
-import * as chromeApi from '../core/chrome-api.js';
-import { state, mutations } from '../core/state.js';
+import * as chromeApi from '../chrome-api.js';
+import { state, mutations } from '../state.js';
 import { get } from '../config/storage.js';
 import { SPECIAL, isSpecial } from './special-nodes.js';
 import { removeFromLayout, saveColumns } from './layout.js';

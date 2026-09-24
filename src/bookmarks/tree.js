@@ -1,6 +1,6 @@
-import * as chromeApi from '../core/chrome-api.js';
+import * as chromeApi from '../chrome-api.js';
 import { SPECIAL, isSpecial, getSpecialNode } from './special-nodes.js';
-import { state, mutations } from '../core/state.js';
+import { state, mutations } from '../state.js';
 
 // Gets function that returns children of node
 export function getChildrenFunction(node) {

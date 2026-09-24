@@ -1,4 +1,4 @@
-import { state } from '../core/state.js';
+import { state } from '../state.js';
 import { get } from '../config/storage.js';
 import { scale } from '../config/styles.js';
 

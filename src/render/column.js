@@ -1,4 +1,4 @@
-import { state } from '../core/state.js';
+import { state } from '../state.js';
 import { get } from '../config/storage.js';
 import { getChildrenFunction, getSubTree } from '../bookmarks/tree.js';
 import { renderAll, setGetChildrenFunction as setNodeGetChildrenFunction, setGetConfig as setNodeGetConfig } from './node.js';

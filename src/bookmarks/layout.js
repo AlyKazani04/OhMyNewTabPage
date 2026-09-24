@@ -1,10 +1,10 @@
-import { state, mutations } from '../core/state.js';
+import { state, mutations } from '../state.js';
 import { get } from '../config/storage.js';
 import { DEFAULTS } from '../config/schema.js';
 import { SPECIAL, specialKeys, isSpecial } from './special-nodes.js';
 import { getChildrenFunction } from './tree.js';
-import * as chromeApi from '../core/chrome-api.js';
-import { emit, Events, on } from '../core/events.js';
+import * as chromeApi from '../chrome-api.js';
+import { emit, Events, on } from '../events.js';
 
 // Initialize SPECIAL in state
 mutations.setSpecial(SPECIAL);

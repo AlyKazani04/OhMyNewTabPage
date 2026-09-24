@@ -1,7 +1,7 @@
 import { get } from '../config/storage.js';
 import { getIcon } from './icons.js';
 import { updateTooltips } from './tooltips.js';
-import * as chromeApi from '../core/chrome-api.js';
+import * as chromeApi from '../chrome-api.js';
 
 // Sets CSS classes for node
 export function setClass(target, node, isOpen) {
@@ -165,7 +165,7 @@ export function renderAll(nodes, target, toplevel) {
 }
 
 // Need to import state for coords check
-import { state } from '../core/state.js';
+import { state } from '../state.js';
 
 // Export openLink for context-menu.js
 export { openLink };

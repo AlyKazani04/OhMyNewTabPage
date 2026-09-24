@@ -1,6 +1,6 @@
 import { get } from '../config/storage.js';
-import * as chromeApi from '../core/chrome-api.js';
-import { state } from '../core/state.js';
+import * as chromeApi from '../chrome-api.js';
+import { state } from '../state.js';
 
 // Virtual (non-bookmark) top-level entries
 export const SPECIAL = {

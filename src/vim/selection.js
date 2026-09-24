@@ -1,5 +1,4 @@
 import { state, mutations } from '../state.js';
-import { get } from '../config/storage.js';
 import { bmGet, bmMove } from '../chrome-api.js';
 import { isRealBookmarkId, normalizeUrl, getDefaultParentId, findParentFolderId, getInsertionContext, copyBookmarkSubtree, clipTargetableId } from '../bookmarks/crud.js';
 import { removeFromLayout, saveColumns, placeInLayout, syncLayoutAfterPaste, isShowRootEnabled } from '../bookmarks/layout.js';

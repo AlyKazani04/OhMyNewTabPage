@@ -1,6 +1,5 @@
 import { state, mutations } from '../state.js';
-import { get } from '../config/storage.js';
-import { DEFAULTS } from '../config/schema.js';
+import { get, DEFAULTS } from '../config/config.js';
 import { SPECIAL, specialKeys, isSpecial } from './special-nodes.js';
 import { getChildrenFunction } from './tree.js';
 import * as chromeApi from '../chrome-api.js';

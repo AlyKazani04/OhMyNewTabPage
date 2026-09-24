@@ -1,4 +1,4 @@
-import { get } from '../config/storage.js';
+import { get } from '../config/config.js';
 import { getIcon } from './icons.js';
 import { updateTooltips } from './tooltips.js';
 import * as chromeApi from '../chrome-api.js';

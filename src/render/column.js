@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { get } from '../config/storage.js';
+import { get } from '../config/config.js';
 import { getChildrenFunction, getSubTree } from '../bookmarks/tree.js';
 import { renderAll, setGetChildrenFunction as setNodeGetChildrenFunction, setGetConfig as setNodeGetConfig } from './node.js';
 

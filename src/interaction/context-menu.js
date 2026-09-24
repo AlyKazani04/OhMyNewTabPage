@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { get } from '../config/storage.js';
+import { get } from '../config/config.js';
 import { addColumn, removeColumn, addRow, removeRow, saveColumns } from '../bookmarks/layout.js';
 import * as chromeApi from '../chrome-api.js';
 

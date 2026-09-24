@@ -1,4 +1,4 @@
-import { get } from '../config/storage.js';
+import { get } from '../config/config.js';
 import * as chromeApi from '../chrome-api.js';
 import { state } from '../state.js';
 

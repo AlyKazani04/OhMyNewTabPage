@@ -1,5 +1,5 @@
 import { state, mutations } from '../state.js';
-import { get, set } from '../config/storage.js';
+import { get, set } from '../config/index.js';
 import { isRealBookmarkId, normalizeUrl, getDefaultParentId, findParentFolderId, getInsertionContext, createBookmarkAt, updateBookmark, deleteBookmarksByIds, clipTargetableId } from '../bookmarks/crud.js';
 import { vimGetTargetIds } from './selection.js';
 import { scheduleRestore } from '../bookmarks/layout.js';

@@ -1,4 +1,3 @@
-import { get } from '../config/storage.js';
 import { getFaviconUrl } from '../chrome-api.js';
 
 // Gets best icon for a node

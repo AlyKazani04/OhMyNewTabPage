@@ -1,6 +1,5 @@
 import './events.js';
 import './state.js';
-import './config/index.js';
 import './bookmarks/index.js';
 import './render/index.js';
 import './interaction/index.js';
@@ -13,7 +12,6 @@ import * as vim from './vim/index.js';
 import * as config from './config/index.js';
 import { emit, Events, on } from './events.js';
 import * as core from './state.js';
-import { loadAll } from './config/storage.js';
 import { initKeyboard } from './interaction/keyboard.js';
 import { loadColumns } from './bookmarks/layout.js';
 
@@ -61,7 +59,7 @@ bookmarks.setScheduleRestoreForCrud(vim.scheduleRestore); // from layout.js via 
 // consumed by crud.js and vim/* modules.
 
 // Initialize config and keyboard
-loadAll();
+config.loadAll();
 initKeyboard();
 
 // Handle ?options query parameter (for options page)

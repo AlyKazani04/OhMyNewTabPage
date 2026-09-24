@@ -1,8 +1,6 @@
-import { get, set, loadAll, currentTheme } from './storage.js';
-import { DEFAULTS, getThemeNames } from './schema.js';
+import { get, set, loadAll, currentTheme, DEFAULTS, getThemeNames, getAllCSS, initCssVars } from './config.js';
 import { emit, Events, on } from '../events.js';
 import * as chromeApi from '../chrome-api.js';
-import { getAllCSS, initCssVars } from './styles.js';
 
 let settingsInitialized = false;
 

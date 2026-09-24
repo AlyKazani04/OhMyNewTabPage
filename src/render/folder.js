@@ -1,6 +1,5 @@
 import { state } from '../state.js';
-import { get } from '../config/storage.js';
-import { scale } from '../config/styles.js';
+import { get, scale } from '../config/config.js';
 
 // Toggle folder open state
 export function toggle(node, anchor) {

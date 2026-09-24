@@ -1,9 +1,5 @@
-import './events.js';
-import './render/index.js';
-import './vim/index.js';
-
 import * as bookmarks from './bookmarks.js';
-import * as render from './render/index.js';
+import * as render from './render.js';
 import * as interaction from './interaction.js';
 import * as vim from './vim/index.js';
 import * as config from './config/index.js';
@@ -15,14 +11,12 @@ import * as core from './state.js';
 bookmarks.setRenderAll(render.renderAll);
 
 // render/node.js needs getChildrenFunction, getConfig, addFolderHandlers, enableDragFolder, toggle
-render.setGetChildrenFunction(bookmarks.getChildrenFunction);
 render.setGetConfig(config.get);
 render.setAddFolderHandlers(interaction.addFolderHandlers);
 render.setEnableDragFolder(interaction.enableDragFolder);
 render.setToggle(render.toggle); // from folder.js via render
 
 // render/folder.js needs getChildrenFunction, renderAll, setClass
-render.setGetChildrenFunctionForFolder(bookmarks.getChildrenFunction);
 render.setRenderAllForFolder(render.renderAll);
 render.setSetClassForFolder(render.setClass);
 

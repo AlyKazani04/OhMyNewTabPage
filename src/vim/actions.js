@@ -2,11 +2,8 @@ import { state } from '../state.js';
 import { get, set } from '../config/index.js';
 import { isRealBookmarkId, normalizeUrl, getInsertionContext, createBookmarkAt, updateBookmark, deleteBookmarksByIds } from '../bookmarks.js';
 import { vimGetTargetIds } from './selection.js';
-import { toggle } from '../render/folder.js';
-import { showModal } from '../interaction.js';
-import { renderMenu } from '../interaction.js';
-import { renderColumns } from '../render/renderer.js';
-import { updateCursorVisuals } from './cursor.js';
+import { toggle } from '../render.js';
+import { showModal, renderMenu } from '../interaction.js';
 
 // Vim activation
 export function vimActivate() {

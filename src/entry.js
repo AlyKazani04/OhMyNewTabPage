@@ -1,7 +1,7 @@
 import * as bookmarks from './bookmarks.js';
 import * as render from './render.js';
 import * as interaction from './interaction.js';
-import * as vim from './vim/index.js';
+import * as vim from './vim.js';
 import * as config from './config/index.js';
 import { Events, on } from './events.js';
 import * as core from './state.js';

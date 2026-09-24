@@ -13,7 +13,7 @@ import {
   vimCancelClipboard,
   vimPaste,
   vimShowThemePicker
-} from './vim/index.js';
+} from './vim.js';
 import { state } from './state.js';
 import { get } from './config/config.js';
 import { folderMoveDrop, addColumn, removeColumn, addRow, removeRow } from './bookmarks.js';

@@ -6,44 +6,6 @@ import * as config from './config/index.js';
 import { Events, on } from './events.js';
 import * as core from './state.js';
 
-// Wire up cross-module dependencies
-// bookmarks/special-nodes.js needs getChildrenFunction and renderAll
-bookmarks.setRenderAll(render.renderAll);
-
-// render/node.js needs getChildrenFunction, getConfig, addFolderHandlers, enableDragFolder, toggle
-render.setGetConfig(config.get);
-render.setAddFolderHandlers(interaction.addFolderHandlers);
-render.setEnableDragFolder(interaction.enableDragFolder);
-render.setToggle(render.toggle); // from folder.js via render
-
-// render/folder.js needs getChildrenFunction, renderAll, setClass
-render.setRenderAllForFolder(render.renderAll);
-render.setSetClassForFolder(render.setClass);
-
-// render/column.js needs addColumnHandlers
-render.setAddColumnHandlers(interaction.addColumnHandlers);
-
-// render/renderer.js needs enableDragColumn, enableDragDrop, renderColumn
-render.setEnableDragColumn(interaction.enableDragColumn);
-render.setEnableDragDrop(interaction.enableDragDrop);
-render.setRenderColumn(render.renderColumn);
-
-// interaction/context-menu.js needs getChildrenFunction, openLink, toggle, renderColumns
-interaction.setGetChildrenFunction(bookmarks.getChildrenFunction);
-interaction.setOpenLink(render.openLink);
-interaction.setToggle(render.toggle); // from folder.js via render
-interaction.setRenderColumns(render.renderColumns);
-
-// interaction/keyboard.js needs showOptions
-interaction.setShowOptions(config.showOptions);
-
-// bookmarks/crud.js needs renderColumns, scheduleRestore
-bookmarks.setRenderColumnsForCrud(render.renderColumns);
-bookmarks.setScheduleRestoreForCrud(vim.scheduleRestore); // from layout.js via bookmarks
-
-// bookmarks/layout.js exposes scheduleRestore/renderColumns as settable bindings,
-// consumed by crud.js and vim/* modules.
-
 // Initialize config and keyboard
 config.loadAll();
 interaction.initKeyboard();

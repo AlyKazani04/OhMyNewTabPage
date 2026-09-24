@@ -16,8 +16,10 @@ import {
 } from './vim.js';
 import { state } from './state.js';
 import { get } from './config/config.js';
-import { folderMoveDrop, addColumn, removeColumn, addRow, removeRow } from './bookmarks.js';
+import { folderMoveDrop, addColumn, removeColumn, addRow, removeRow, getChildrenFunction } from './bookmarks.js';
 import * as chromeApi from './chrome-api.js';
+import { openLink, toggle } from './render.js';
+import { showOptions } from './config/ui.js';
 
 
 // Keyboard handler
@@ -57,9 +59,6 @@ export function initKeyboard() {
     if (handled) event.preventDefault();
   });
 }
-
-let showOptions = null;
-export function setShowOptions(fn) { showOptions = fn; }
 
 // ----- MODAL -----
 // Modal dialog
@@ -269,27 +268,17 @@ async function openLinks(node) {
   try {
     await chromeApi.getCurrentTab();
     getChildrenFunction(node)((result) => {
-      for (let i = 0; i < result.length; i++) openLinkFn(result[i], 2);
+      for (let i = 0; i < result.length; i++) openLink(result[i], 2);
     });
   } catch (err) {
     console.warn('Failed to get current tab:', err);
   }
 }
 
-let getChildrenFunction = null;
-let openLinkFn = null;
-let toggleFn = null;
-let renderColumnsFn = null;
-
-export function setGetChildrenFunction(fn) { getChildrenFunction = fn; }
-export function setOpenLink(fn) { openLinkFn = fn; }
-export function setToggle(fn) { toggleFn = fn; }
-export function setRenderColumns(fn) { renderColumnsFn = fn; }
-
 // Enables click and context menu for given folder
 export function addFolderHandlers(node, anchor) {
   // Click handler
-  anchor.onclick = () => { if (toggleFn) toggleFn(node, anchor, getChildrenFunction(node)); return false; };
+  anchor.onclick = () => { toggle(node, anchor, getChildrenFunction(node)); return false; };
 
   // Context menu handler
   let items = getMenuItems(node);

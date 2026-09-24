@@ -1,10 +1,12 @@
-// ----- SPECIAL_NODES -----
 import { get, DEFAULTS } from './config/config.js';
 import * as chromeApi from './chrome-api.js';
 import { state, mutations } from './state.js';
 import { emit, Events, on } from './events.js';
+import { renderAll, renderColumns } from './render.js';
+import { scheduleRestore } from './vim.js';
 
 
+// ----- SPECIAL_NODES -----
 // Virtual (non-bookmark) top-level entries
 export const SPECIAL = {
   apps: {
@@ -138,11 +140,6 @@ export function refreshClosed() {
   getChildrenFunction({ id: 'closed' })((result) => {
     for (let i = 0; i < targets.length; i++) renderAll(result, targets[i]);
   });
-}
-
-let renderAll = null;
-export function setRenderAll(fn) {
-  renderAll = fn;
 }
 
 // ----- LAYOUT -----
@@ -363,11 +360,11 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
     }
   }
   if (flatX > -1) {
-    scheduleRestoreFn(ids[0]);
+    scheduleRestore(ids[0]);
     saveColumns(); // triggers the re-render
   } else if (state.vimEl && state.vimEl._vimNode && state.coords && state.coords[state.vimEl._vimNode.id]) {
     // Top level (stored in the layout grid): land the cursor on the first pasted item once rendered
-    scheduleRestoreFn(ids[0]);
+    scheduleRestore(ids[0]);
     const pos = state.coords[state.vimEl._vimNode.id];
     placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
   } else {
@@ -376,12 +373,6 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
     saveColumns(); // triggers the re-render
   }
 }
-
-export let scheduleRestore = null;
-export let renderColumns = null;
-
-export function setScheduleRestore(fn) { scheduleRestore = fn; }
-export function setRenderColumns(fn) { renderColumns = fn; }
 
 // Reload and re-render the layout when a layout-affecting config key changes
 // (lock, newtab, show_root, number_* — see config/storage.js).
@@ -453,12 +444,6 @@ export function getSubTree(id, callback) {
 }
 
 // ----- CRUD -----
-let renderColumnsFn = null;
-let scheduleRestoreFn = null;
-
-export function setRenderColumnsForCrud(fn) { renderColumnsFn = fn; }
-export function setScheduleRestoreForCrud(fn) { scheduleRestoreFn = fn; }
-
 // Check if ID is a real bookmark (numeric)
 export function isRealBookmarkId(id) {
   return /^\d+$/.test(String(id));
@@ -512,10 +497,9 @@ export async function createBookmarkAt(props, afterId) {
     const result = await chromeApi.bmCreate(props);
     if (!result) {
       console.warn('create failed');
-    } else if (scheduleRestoreFn) {
-      scheduleRestoreFn(result.id);
     }
-    if (renderColumnsFn) renderColumnsFn();
+    scheduleRestore(result.id);
+    renderColumns();
   };
   if (!afterId) return finish(null);
   const results = await chromeApi.bmGet(afterId);
@@ -533,10 +517,9 @@ export async function updateBookmark(id, props) {
   await chromeApi.bmUpdate(id, props);
   if (chrome.runtime.lastError) {
     console.warn('edit failed:', chrome.runtime.lastError.message);
-  } else if (scheduleRestoreFn) {
-    scheduleRestoreFn(id);
   }
-  if (renderColumnsFn) renderColumnsFn();
+  scheduleRestore(id);
+  renderColumns();
 }
 
 // Delete bookmarks by IDs
@@ -558,9 +541,8 @@ export async function deleteBookmarksByIds(ids) {
   if (topLevel.length > 0) {
     removeFromLayout(topLevel);
     saveColumns();
-  } else if (renderColumnsFn) {
-    renderColumnsFn();
   }
+  renderColumns();
 }
 
 // Move bookmark

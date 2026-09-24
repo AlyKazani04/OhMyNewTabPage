@@ -3,6 +3,7 @@ import * as chromeApi from './chrome-api.js';
 import { state } from './state.js';
 import { getChildrenFunction, getSubTree } from './bookmarks.js';
 import { emit, Events } from './events.js';
+import { enableDragColumn, enableDragFolder, enableDragDrop, addColumnHandlers, addFolderHandlers } from './interaction.js';
 
 
 // ----- NODE -----
@@ -39,28 +40,6 @@ export async function openLink(node, newtab) {
   }
 }
 
-let getConfig = get; // default to config.get
-let addFolderHandlers = null;
-let enableDragFolder = null;
-let toggleFn = null;
-
-export function setGetConfig(fn) {
-  getConfig = fn;
-}
-
-export function setAddFolderHandlers(fn) {
-  addFolderHandlers = fn;
-}
-
-export function setEnableDragFolder(fn) {
-  enableDragFolder = fn;
-}
-
-export function setToggle(fn) {
-  toggleFn = fn;
-}
-
-// Render a single bookmark node
 export function render(node, target) {
   if (node.description === 'separator') return;
 
@@ -221,7 +200,7 @@ export function updateTooltips() {
 // Toggle folder open state
 export function toggle(node, anchor) {
   const isOpen = anchor.open;
-  if (setClassFn) setClassFn(anchor, node, !isOpen);
+  setClass(anchor, node, !isOpen);
   anchor.open = !isOpen;
 
   if (isOpen) {
@@ -257,14 +236,13 @@ export function toggle(node, anchor) {
     // Open folder
     if (anchor.nextSibling) {
       animate(node, anchor, isOpen);
-    } else if (getChildrenFunction && renderAllFn) {
-      getChildrenFunction(node)((result) => {
-        if (!anchor.nextSibling && anchor.open) {
-          renderAllFn(result, anchor.parentNode);
-          animate(node, anchor, isOpen);
-        }
-      });
     }
+    getChildrenFunction(node)((result) => {
+      if (!anchor.nextSibling && anchor.open) {
+        renderAll(result, anchor.parentNode);
+        animate(node, anchor, isOpen);
+      }
+    });
   }
 }
 
@@ -306,17 +284,6 @@ export function animate(node, anchor, isOpen) {
   }, duration);
 }
 
-let renderAllFn = null;
-let setClassFn = null;
-
-export function setRenderAllForFolder(fn) {
-  renderAllFn = fn;
-}
-
-export function setSetClassForFolder(fn) {
-  setClassFn = fn;
-}
-
 // ----- COLUMN -----
 // Render column with given index
 export function renderColumn(index, target) {
@@ -327,7 +294,7 @@ export function renderColumn(index, target) {
     getChildrenFunction({ id: ids[0] })((result) => {
       if (!state.columns[index]) return;
       renderAll(result, target);
-      if (addColumnHandlersFn) addColumnHandlersFn(index, target);
+      addColumnHandlers(index, target);
     });
   } else if (ids.length > 0) {
     let i = 0;
@@ -343,17 +310,11 @@ export function renderColumn(index, target) {
       } else {
         // Render node list
         renderAll(nodes, target, true);
-        if (addColumnHandlersFn) addColumnHandlersFn(index, target);
+        addColumnHandlers(index, target);
       }
     };
     getSubTree(ids[i], callback);
   }
-}
-
-let addColumnHandlersFn = null;
-
-export function setAddColumnHandlers(fn) {
-  addColumnHandlersFn = fn;
 }
 
 // ----- RENDERER -----
@@ -371,30 +332,14 @@ export function renderColumns() {
     column.style.width = (1 / state.columns.length) * 100 + '%';
 
     // Enable drag and drop
-    if (enableDragColumnFn) enableDragColumnFn(i, column);
+    enableDragColumn(i, column);
 
     target.appendChild(column);
-    if (renderColumnFn) renderColumnFn(i, column);
+    renderColumn(i, column);
   }
 
-  if (enableDragDropFn) enableDragDropFn();
+  enableDragDrop();
 
   // Signal render complete
   emit(Events.RENDER_COMPLETE);
-}
-
-let enableDragColumnFn = null;
-let enableDragDropFn = null;
-let renderColumnFn = null;
-
-export function setEnableDragColumn(fn) {
-  enableDragColumnFn = fn;
-}
-
-export function setEnableDragDrop(fn) {
-  enableDragDropFn = fn;
-}
-
-export function setRenderColumn(fn) {
-  renderColumnFn = fn;
 }

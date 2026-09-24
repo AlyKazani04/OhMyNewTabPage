@@ -58,7 +58,7 @@ bookmarks.setScheduleRestoreForCrud(vim.scheduleRestore); // from layout.js via 
 
 // Initialize config and keyboard
 config.loadAll();
-initKeyboard();
+interaction.initKeyboard();
 
 // Handle ?options query parameter (for options page)
 if (location.search.includes('options')) {

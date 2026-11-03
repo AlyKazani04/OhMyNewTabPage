@@ -62,7 +62,7 @@ export function render(node, target) {
   if (node.action) {
     a.onclick = (event) => node.action(event);
   } else if (url) {
-    const newtab = getConfig('newtab');
+    const newtab = get('newtab');
     if (newtab === 1) {
       // New foreground tab
       a.target = '_blank';
@@ -99,7 +99,7 @@ export function render(node, target) {
     // Render children
     if (
       a.open ||
-      (getConfig('remember_open') && localStorage.getItem('open.' + node.id))
+      (get('remember_open') && localStorage.getItem('open.' + node.id))
     ) {
       setClass(a, node, true);
       a.open = true;

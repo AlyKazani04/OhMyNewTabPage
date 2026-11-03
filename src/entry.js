@@ -17,31 +17,8 @@ if (location.search.includes('options')) {
 
 // Event listeners for render requests
 on(Events.RENDER_REQUESTED, () => {
-  if (window.renderColumns) window.renderColumns();
+  render.renderColumns();
 });
 
-// Publish module functions on window (consumed by event handlers and legacy global callers)
-window.renderColumns = render.renderColumns;
-window.toggle = render.toggle;
-window.getConfig = config.get;
-window.setConfig = config.set;
-window.themes = config.THEMES;
-window.showOptions = config.showOptions;
-window.renderMenu = interaction.renderMenu;
-window.getChildrenFunction = bookmarks.getChildrenFunction;
-window.SPECIAL = bookmarks.SPECIAL;
-window.clipTargetableId = bookmarks.clipTargetableId;
-window.getCoords = (id) => core.getters.getCoords(id);
-window.renderAll = render.renderAll;
-window.saveColumns = bookmarks.saveColumns;
-window.loadSettings = config.loadAll;
-window.initSettings = config.initSettings;
-window.initConfig = config.initConfig;
-window.showConfig = config.showConfig;
-window.onChange = config.onChange;
-window.getStyle = config.generateCSS;
-window.scale = config.scale;
-
 // Kick off the initial layout load (fetches the bookmarks root, builds columns, renders).
-// Runs last so the RENDER_REQUESTED listener and window.renderColumns above are ready.
 bookmarks.loadColumns();

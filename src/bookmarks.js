@@ -136,7 +136,6 @@ export function refreshClosed() {
     targets.push(target);
   }
 
-  if (!getChildrenFunction || !renderAll) return;
   getChildrenFunction({ id: 'closed' })((result) => {
     for (let i = 0; i < targets.length; i++) renderAll(result, targets[i]);
   });

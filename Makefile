@@ -13,7 +13,7 @@ clean:
 release: clean build
 	mkdir -p release/icons
 	cp newtab.html newtab.css LICENSE manifest.json release/
-	cp temp_output.js temp_output.js.map release/
+	cp output.js output.js.map release/
 	cp icons/* release/icons/
 	cd release && zip -r ../$(DIST).zip .
 

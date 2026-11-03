@@ -1,5 +1,5 @@
 import { state, mutations } from './state.js';
-import { get, set } from './config/index.js';
+import { get, set, THEMES } from './config/index.js';
 import {
   isRealBookmarkId,
   normalizeUrl,
@@ -121,7 +121,7 @@ export function vimDelete() {
 export function vimShowThemePicker() {
   const items = [];
   const current = get('theme');
-  const names = Object.keys(window.themes || {});
+  const names = Object.keys(THEMES);
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
     items.push({
@@ -133,6 +133,7 @@ export function vimShowThemePicker() {
   let x = 100, y = 100;
   if (state.vimEl) {
     const rect = state.vimEl.getBoundingClientRect();
+    console.log(`scX${window.scrollX} scY:${window.scrollY}`);
     x = rect.left + window.scrollX;
     y = rect.bottom + window.scrollY;
   }

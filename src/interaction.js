@@ -16,7 +16,9 @@ import {
 } from './vim.js';
 import { state } from './state.js';
 import { get } from './config/config.js';
-import { folderMoveDrop, addColumn, removeColumn, addRow, removeRow, getChildrenFunction } from './bookmarks.js';
+import { getChildrenFunction } from './bookmarks/tree.js';
+import { addColumn, removeColumn, addRow, removeRow } from './bookmarks/layout.js';
+import { folderMoveDrop } from './bookmarks/crud.js';
 import * as chromeApi from './chrome-api.js';
 import { openLink, toggle } from './render.js';
 import { showOptions } from './config/ui.js';

@@ -1,9 +1,15 @@
 import { get, scale } from './config/config.js';
 import * as chromeApi from './chrome-api.js';
 import { state } from './state.js';
-import { getChildrenFunction, getSubTree } from './bookmarks.js';
+import { getChildrenFunction, getSubTree } from './bookmarks/tree.js';
 import { emit, Events } from './events.js';
-import { enableDragColumn, enableDragFolder, enableDragDrop, addColumnHandlers, addFolderHandlers } from './interaction.js';
+import {
+  enableDragColumn,
+  enableDragFolder,
+  enableDragDrop,
+  addColumnHandlers,
+  addFolderHandlers
+} from './interaction.js';
 
 
 // ----- NODE -----
@@ -109,9 +115,9 @@ export function render(node, target) {
     }
 
     // Click handlers
-    if (addFolderHandlers) addFolderHandlers(node, a);
-    if (enableDragFolder) enableDragFolder(node, a);
-  } else if (node.id === 'apps' && enableDragFolder) {
+    addFolderHandlers(node, a);
+    enableDragFolder(node, a);
+  } else if (node.id === 'apps') {
     enableDragFolder(node, a);
   }
 

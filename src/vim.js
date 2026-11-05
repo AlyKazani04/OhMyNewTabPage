@@ -7,12 +7,12 @@ import {
   createBookmarkAt,
   updateBookmark,
   deleteBookmarksByIds,
-  syncLayoutAfterPaste,
   getDefaultParentId,
   findParentFolderId,
   copyBookmarkSubtree,
   clipTargetableId
-} from './bookmarks.js';
+} from './bookmarks/crud.js';
+import { syncLayoutAfterPaste } from './bookmarks/layout.js';
 import { toggle } from './render.js';
 import { showModal, renderMenu } from './interaction.js';
 import { bmGet, bmMove } from './chrome-api.js';

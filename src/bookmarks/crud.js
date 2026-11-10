@@ -56,9 +56,18 @@ export function getInsertionContext() {
 export async function createBookmarkAt(props, afterId) {
   const finish = async (index) => {
     if (index != null) props.index = index;
-    const result = await chromeApi.bmCreate(props);
+    let result;
+    try {
+      result = await chromeApi.bmCreate(props);
+    } catch (err) {
+      // chrome-api.js rejects when chrome.runtime.lastError is set, so the
+      // `!result` guard below is the second failure mode, not the first.
+      console.warn('create failed:', err?.message || err);
+      return;
+    }
     if (!result) {
       console.warn('create failed');
+      return;
     }
     emit(Events.BOOKMARK_CREATED, result.id);
     renderColumns();
@@ -76,26 +85,34 @@ export async function createBookmarkAt(props, afterId) {
 
 // Update bookmark
 export async function updateBookmark(id, props) {
-  await chromeApi.bmUpdate(id, props);
-  if (chrome.runtime.lastError) {
-    console.warn('edit failed:', chrome.runtime.lastError.message);
+  try {
+    await chromeApi.bmUpdate(id, props);
+  } catch (err) {
+    // chrome-api.js rejects on lastError, so a post-await `lastError` check
+    // here could never be true — it was dead code.
+    console.warn('edit failed:', err?.message || err);
+    return;
   }
   emit(Events.BOOKMARK_UPDATED, id);
   renderColumns();
 }
 
-// Delete bookmarks by IDs
+// Delete bookmarks by IDs. One failure must not abort the rest of the batch.
 export async function deleteBookmarksByIds(ids) {
   for (let i = 0; i < ids.length; i++) {
-    const results = await chromeApi.bmGet(ids[i]);
-    if (!results || !results[0]) continue;
-    if (results[0].url) {
-      await chromeApi.bmRemove(ids[i]);
-    } else {
-      await chromeApi.bmRemoveTree(ids[i]);
+    let results;
+    try {
+      results = await chromeApi.bmGet(ids[i]);
+    } catch (err) {
+      console.warn('delete failed:', err?.message || err);
+      continue;
     }
-    if (chrome.runtime.lastError) {
-      console.warn('delete failed:', chrome.runtime.lastError.message);
+    if (!results || !results[0]) continue;
+    try {
+      if (results[0].url) await chromeApi.bmRemove(ids[i]);
+      else await chromeApi.bmRemoveTree(ids[i]);
+    } catch (err) {
+      console.warn('delete failed:', err?.message || err);
     }
   }
   // Prune layout entries for deleted top-level items

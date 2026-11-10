@@ -1,7 +1,7 @@
 import * as chromeApi from '../chrome-api.js';
 import { isSpecial } from './special-nodes.js';
 import { state } from '../state.js';
-import { scheduleRestore } from '../vim.js';
+import { emit, Events } from '../events.js';
 import { renderColumns } from '../render.js';
 import { removeFromLayout, saveColumns } from './layout.js';
 
@@ -60,7 +60,7 @@ export async function createBookmarkAt(props, afterId) {
     if (!result) {
       console.warn('create failed');
     }
-    scheduleRestore(result.id);
+    emit(Events.BOOKMARK_CREATED, result.id);
     renderColumns();
   };
   if (!afterId) return finish(null);
@@ -80,7 +80,7 @@ export async function updateBookmark(id, props) {
   if (chrome.runtime.lastError) {
     console.warn('edit failed:', chrome.runtime.lastError.message);
   }
-  scheduleRestore(id);
+  emit(Events.BOOKMARK_UPDATED, id);
   renderColumns();
 }
 

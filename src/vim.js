@@ -14,7 +14,8 @@ import {
 } from './bookmarks/crud.js';
 import { syncLayoutAfterPaste } from './bookmarks/layout.js';
 import { toggle } from './render.js';
-import { showModal, renderMenu } from './interaction.js';
+import { showModal, renderMenu } from './overlay.js';
+import { on, Events } from './events.js';
 import { bmGet, bmMove } from './chrome-api.js';
 
 
@@ -271,6 +272,13 @@ export function moveCursor(dx, dy) {
   updateCursorVisuals();
 }
 
+// ----- EVENT WIRING -----
+// The data layer reports writes; the cursor layer decides where to land.
+// crud.js emits instead of importing scheduleRestore, which is what removes
+// the crud.js -> vim.js edge of the import cycle.
+on(Events.BOOKMARK_CREATED, scheduleRestore);
+on(Events.BOOKMARK_UPDATED, scheduleRestore);
+
 // ----- OBSERVER -----
 let vimRafPending = false;
 const vimObserver = new MutationObserver(() => {
@@ -427,8 +435,14 @@ async function pasteBatch(mode, ids, below) {
     }
 
     mutations.clearClipboard();
-    if (done.length > 0) syncLayoutAfterPaste(done, parentId, below);
-    else updateCursorVisuals();
+    if (done.length > 0) {
+      syncLayoutAfterPaste(done, parentId, below);
+      // layout.js must not reach into vim.js to restore the cursor, so the
+      // caller — the only owner of cursor state — does it here.
+      scheduleRestore(done[0]);
+    } else {
+      updateCursorVisuals();
+    }
   } catch (e) {
     console.error("Error: ", e);
   }

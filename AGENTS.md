@@ -27,11 +27,12 @@ src/
 │   ├── special-nodes.js  # Virtual nodes: apps, top, recent, closed, devices
 │   └── index.js     # Barrel
 ├── render.js        # renderColumns/renderColumn/renderAll/toggle/animate/tooltips
-├── interaction.js   # Keyboard, drag-drop, context menu, modal/menu rendering
+├── overlay.js       # Modal dialog + popup menu (imports nothing — cannot cycle)
+├── interaction.js   # Keyboard, drag-drop, context menu item lists
 └── vim.js           # Cursor, selection, yank/cut/paste, theme picker, dialogs
 ```
 
-There is **no dependency injection**. Modules import each other directly; `config/index.js` and `bookmarks/index.js` are barrels, everything else imports the module file. Circular imports still exist — see Gotchas.
+There is **no dependency injection**. Modules import each other directly; `config/index.js` and `bookmarks/index.js` are barrels, everything else imports the module file. One circular import remains — see Gotchas.
 
 ## Build & Development
 
@@ -43,7 +44,8 @@ There is **no dependency injection**. Modules import each other directly; `confi
 ## Key Patterns
 
 - **State**: single source of truth in `state.js` (`state.columns`, `state.root`, `state.coords`, `state.special`, `state.vim*`). Mutate via `mutations.*`, read via `getters.*`. Direct assignment still happens in a few places (see Gotchas).
-- **Events**: `events.js` — `on(event, handler)` / `emit(event, data)`. Constants live in `Events` (`RENDER_REQUESTED`, `CONFIG_CHANGED`, `COLUMNS_CHANGED`, …); a custom `'bookmarks:visibility'` event carries `{ id, visible }`.
+- **Events**: `events.js` — `on(event, handler)` / `emit(event, data)`. Constants live in `Events` (`RENDER_REQUESTED`, `RENDER_COMPLETE`, `BOOKMARK_CREATED`, `CONFIG_CHANGED`, `COLUMNS_CHANGED`, …); a custom `'bookmarks:visibility'` event carries `{ id, visible }`.
+- **Data → event → cursor**: `bookmarks/crud.js` never imports `vim.js`. It emits `BOOKMARK_CREATED`/`BOOKMARK_UPDATED`; `vim.js` listens and calls `scheduleRestore`. Paste follows the same shape: `layout.js` places the items, then its caller (`vim.js`) restores the cursor. This is deliberate — it keeps the data layer free of cursor concerns and is what breaks the `crud.js` → `vim.js` edge.
 - **Chrome APIs**: promise-wrapped in `chrome-api.js`. Never call `chrome.*` directly in feature modules.
 - **Config**: `config/config.js` holds `DEFAULTS`/`THEMES`/`LIGHT_THEMES`/`validate` (schema), `get`/`set`/`loadAll` (localStorage under the `options.` prefix), and `applyCssVar`/`initCssVars`/`getAllCSS` (styling). `set()` re-emits: layout keys (`lock`/`newtab`/`show_root`/`number_*`) → `COLUMNS_CHANGED`; `show_*` → `'bookmarks:visibility'`; theme keys (`theme`/`theme_light`/`theme_mode`) → re-resolve and re-apply everything.
 - **Theming**: `theme_mode` is System/Light/Dark. System follows `prefers-color-scheme` live; `theme` and `theme_light` are separate slots. A one-time migration (marked by `meta.theme_mode_migrated`) pins pre-existing users to Dark or Light.
@@ -69,6 +71,7 @@ There is **no dependency injection**. Modules import each other directly; `confi
 | Add vim command | `vim.js` (action) → `interaction.js` (key handler) |
 | Add special node | `bookmarks/special-nodes.js` (`SPECIAL`) + `bookmarks/tree.js` |
 | Change rendering | `render.js` |
+| Change modal / popup menu UI | `overlay.js` |
 | Modify drag-drop | `interaction.js` |
 | Add a Chrome API call | `chrome-api.js` (wrapper) → call the wrapper |
 
@@ -89,7 +92,8 @@ There is **no dependency injection**. Modules import each other directly; `confi
 - `chrome.sessions.getRecentlyClosed` returns windows/tabs mixed — normalized in `bookmarks/special-nodes.js`.
 - Favicon service: `/_favicon/?pageUrl=<url>&size=16` (Chrome internal).
 - `localStorage` keys prefixed with `options.` and `column.X.Y`.
-- **Circular imports exist**: `render.js` → `bookmarks/tree.js` → `bookmarks/special-nodes.js` → `render.js`, and `interaction.js` → `bookmarks/crud.js` → `vim.js` → `interaction.js`. ES modules tolerate these, but they make initialization order fragile — do not add new ones.
+- **One circular import remains**: `render.js` → `bookmarks/tree.js` → `bookmarks/layout.js` → `bookmarks/special-nodes.js` → `render.js`. ES modules tolerate it, but it makes initialization order fragile — do not add new ones.
+- **`layout.js` runs `mutations.setSpecial(SPECIAL)` at module scope**, and `SPECIAL` comes from `special-nodes.js`. Under native ESM the real boot order (`entry.js` → `bookmarks/index.js`, whose barrel evaluates `special-nodes.js` first) throws `Cannot access 'SPECIAL' before initialization`. The esbuild bundle reorders modules and does not hit it, so the shipped extension is unaffected — but anything importing `src/` directly must enter the graph via `render.js` first. Breaking the cycle above fixes this properly.
 - **`vim.js` has an import-time side effect**: it creates a `MutationObserver` on `#main` and calls `vimInit()` at module scope. Importing `vim.js` is not free.
 - **DOM expandos still carry state**: `anchor._vimNode` (full bookmark node) and `anchor.open` (folder expanded flag) are set in `render.js` and read in `bookmarks/crud.js`, `bookmarks/layout.js`, `interaction.js`. Module-private `dragIds`/`dropTarget` (`interaction.js`) and `tooltipTimeout` (`render.js`) also remain outside `state.js`.
 - `events.js` swallows handler errors (logs via `console.error`) — an exception in one listener won't break others.

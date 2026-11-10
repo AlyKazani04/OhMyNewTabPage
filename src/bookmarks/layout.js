@@ -209,7 +209,10 @@ export function inColumns(id) {
   return false;
 }
 
-// Sync layout after paste
+// Sync layout after paste. Deliberately does not touch cursor state: the
+// caller (vim.js) schedules the restore, so this module stays free of any
+// vim dependency. It used to call scheduleRestore here without importing it,
+// which threw a ReferenceError on the flat-column and top-level paths.
 export function syncLayoutAfterPaste(ids, parentId, below) {
   // Flattened column: a lone root folder rendered as its own contents
   let flatX = -1;
@@ -222,11 +225,9 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
     }
   }
   if (flatX > -1) {
-    scheduleRestore(ids[0]);
     saveColumns(); // triggers the re-render
   } else if (state.vimEl && state.vimEl._vimNode && state.coords && state.coords[state.vimEl._vimNode.id]) {
     // Top level (stored in the layout grid): land the cursor on the first pasted item once rendered
-    scheduleRestore(ids[0]);
     const pos = state.coords[state.vimEl._vimNode.id];
     placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
   } else {

@@ -23,6 +23,7 @@ import * as chromeApi from './chrome-api.js';
 import { openLink, toggle } from './render.js';
 import { showOptions } from './config/ui.js';
 import { on, Events } from './events.js';
+import { renderMenu } from './overlay.js';
 
 
 // Keyboard handler
@@ -63,183 +64,12 @@ export function initKeyboard() {
   });
 }
 
-// ----- MODAL -----
-// Modal dialog
-export function showModal(options) {
-  const prevFocus = document.activeElement;
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'vim-modal-backdrop';
-
-  const form = document.createElement('form');
-  form.className = 'vim-modal';
-
-  const heading = document.createElement('div');
-  heading.className = 'vim-modal-title';
-  heading.innerText = options.title;
-  form.appendChild(heading);
-
-  const inputs = [];
-  for (let i = 0; i < options.fields.length; i++) {
-    const field = options.fields[i];
-    const label = document.createElement('label');
-    label.className = 'vim-modal-field';
-    const p = document.createElement('p');
-    p.innerText = field.label;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = field.placeholder || '';
-    input.value = field.value || '';
-    label.appendChild(p);
-    label.appendChild(input);
-    form.appendChild(label);
-    inputs.push(input);
-  }
-
-  const buttons = document.createElement('div');
-  buttons.className = 'vim-modal-buttons';
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.innerText = 'Cancel';
-  cancel.onclick = close;
-  const submit = document.createElement('button');
-  submit.type = 'submit';
-  submit.innerText = options.submitLabel || 'Submit';
-  buttons.appendChild(cancel);
-  buttons.appendChild(submit);
-  form.appendChild(buttons);
-
-  function close() {
-    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-    document.removeEventListener('keydown', onKeyDown, true);
-    if (prevFocus && prevFocus.isConnected && prevFocus.focus) prevFocus.focus();
-  }
-
-  function onKeyDown(event) {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      close();
-    }
-  }
-
-  form.onsubmit = (event) => {
-    event.preventDefault();
-    const values = inputs.map(input => input.value.trim());
-    if (!options.onSubmit(values)) return;
-    close();
-  };
-
-  backdrop.onmousedown = (event) => {
-    if (event.target === backdrop) close();
-    return false;
-  };
-
-  document.addEventListener('keydown', onKeyDown, true);
-  backdrop.appendChild(form);
-  document.body.appendChild(backdrop);
-  if (inputs.length > 0) inputs[0].focus();
-  else cancel.focus();
-}
-// ----- CONTEXT_MENU -----
-// Wraps click handler for menu items
-function onMenuClick(item, ul) {
-  return function () {
-    item.action();
-    closeMenu(ul);
-    return false;
-  };
-}
-
-// Renders a popup menu at given coordinates
-export function renderMenu(items, x, y, label) {
-  const ul = document.createElement('ul');
-  ul.className = 'menu';
-  ul.setAttribute('role', 'menu');
-  if (label) ul.setAttribute('aria-label', label);
-  const prevFocus = document.activeElement;
-  ul._prevFocus = prevFocus;
-  let selectedAnchor = null;
-
-  for (let i = 0; i < items.length; i++) {
-    const li = document.createElement('li');
-    if (items[i]) {
-      const a = document.createElement('a');
-      a.innerText = items[i].label;
-      a.tabIndex = -1;
-      a.setAttribute('role', 'menuitem');
-      if (items[i].selected === true) {
-        a.setAttribute('aria-checked', 'true');
-        selectedAnchor = a;
-      }
-      a.onclick = onMenuClick(items[i], ul);
-      li.appendChild(a);
-    } else if (i > 0 && i < items.length - 1) {
-      li.appendChild(document.createElement('hr'));
-    } else continue;
-    ul.appendChild(li);
-  }
-
-  document.body.appendChild(ul);
-  const firstAnchor = ul.querySelector('a');
-  if (selectedAnchor) selectedAnchor.focus();
-  else if (firstAnchor) firstAnchor.focus();
-
-  ul.style.left = Math.max(Math.min(x, window.innerWidth + window.scrollX - ul.clientWidth), 0) + 'px';
-  ul.style.top = Math.max(Math.min(y, window.innerHeight + window.scrollY - ul.clientHeight), 0) + 'px';
-
-  ul.onmousedown = (event) => { event.stopPropagation(); return true; };
-
-  setTimeout(() => {
-    document.onclick = () => { closeMenu(ul); return true; };
-    document.onmousedown = () => { closeMenu(ul); return true; };
-    document.oncontextmenu = () => { closeMenu(ul); return true; };
-    document.onkeydown = (event) => {
-      if (event.code === 'Escape') { closeMenu(ul); return true; }
-      const anchors = ul.querySelectorAll('a[role="menuitem"]');
-      if (!anchors.length) return true;
-      let idx = -1;
-      for (let i = 0; i < anchors.length; i++) {
-        if (anchors[i] === document.activeElement) { idx = i; break; }
-      }
-      if (event.code === 'ArrowDown') {
-        event.preventDefault();
-        const next = idx < 0 ? 0 : (idx + 1) % anchors.length;
-        anchors[next].focus();
-      } else if (event.code === 'ArrowUp') {
-        event.preventDefault();
-        const prev = idx < 0 ? anchors.length - 1 : (idx - 1 + anchors.length) % anchors.length;
-        anchors[prev].focus();
-      } else if (event.code === 'Home') {
-        event.preventDefault();
-        anchors[0].focus();
-      } else if (event.code === 'End') {
-        event.preventDefault();
-        anchors[anchors.length - 1].focus();
-      } else if (event.code === 'Enter' || event.code === 'Space') {
-        event.preventDefault();
-        const target = event.target;
-        if (target && target.getAttribute && target.getAttribute('role') === 'menuitem') {
-          target.click();
-        } else {
-          const focused = ul.querySelector('a:focus');
-          if (focused) focused.click();
-        }
-      }
-      return true;
-    };
-  }, 20);
-  return ul;
-}
-
-// Removes the given popup menu
-export function closeMenu(ul) {
-  if (ul && ul.parentNode) ul.parentNode.removeChild(ul);
-  document.onclick = null;
-  document.onmousedown = null;
-  document.oncontextmenu = null;
-  document.onkeydown = null;
-  if (ul && ul._prevFocus && ul._prevFocus.focus) ul._prevFocus.focus();
-}
+// ----- MODAL / CONTEXT MENU -----
+// The modal dialog and popup menu now live in overlay.js. Keeping them out of
+// this module is what lets vim.js use them without importing interaction.js,
+// which would close the cycle vim.js -> interaction.js -> vim.js.
+// renderMenu is still imported below: addFolderHandlers and addColumnHandlers
+// build the context menu item lists and render them here.
 
 // Gets context menu items for given node
 export function getMenuItems(node) {

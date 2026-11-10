@@ -174,19 +174,25 @@ function showNotice(text) {
   noticeTimer = setTimeout(() => notice.remove(), 2500);
 }
 
-// Anchor for id inside scope; polls briefly in case children render late
-async function findAnchor(scope, id) {
-  const end = performance.now() + 2000;
+// Polls fn on animation frames until it returns non-null or the deadline passes,
+// in case children render late
+async function poll(fn, end) {
   for (;;) {
-    for (const a of scope.querySelectorAll('a')) if (a._vimNode && a._vimNode.id === id) return a;
-    if (performance.now() > end) return null;
+    const v = fn();
+    if (v != null || performance.now() > end) return v ?? null;
     await new Promise(requestAnimationFrame);
   }
+}
+
+// Anchor for id inside scope
+function findAnchor(scope, id, end) {
+  return poll(() => [...scope.querySelectorAll('a')].find(a => a._vimNode && a._vimNode.id === id), end);
 }
 
 // Open the entry's ancestor folders in its column and put the vim cursor on it
 async function revealEntry(entry, openFolder) {
   if (close) close();
+  const end = performance.now() + 2000;
   const chain = [...entry.ancestors, entry.node.id];
   const pick = pickColumn(chain, state.columns, !!get('show_root'));
   if (!pick) {
@@ -203,7 +209,7 @@ async function revealEntry(entry, openFolder) {
   // (the Recent bookmarks section, or the item's old folder) is never picked.
   let scope = col;
   for (const id of chain.slice(pick.start, -1)) {
-    const a = scope && await findAnchor(scope, id);
+    const a = scope && await findAnchor(scope, id, end);
     if (!a) {
       showNotice("Couldn't reveal it — reload the page");
       return;
@@ -211,9 +217,12 @@ async function revealEntry(entry, openFolder) {
     if (!a.open) toggle(a._vimNode, a);
     scope = a.parentNode;
   }
-  const target = scope && await findAnchor(scope, entry.node.id);
-  const index = target ? getVisibleLinks(pick.x).indexOf(target) : -1;
-  if (index < 0) {
+  const target = scope && await findAnchor(scope, entry.node.id, end);
+  const index = target && await poll(() => {
+    const i = getVisibleLinks(pick.x).indexOf(target);
+    return i < 0 ? null : i;
+  }, end);
+  if (index == null) {
     showNotice("Couldn't reveal it — reload the page");
     return;
   }

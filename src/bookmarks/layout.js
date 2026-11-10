@@ -237,7 +237,7 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
 }
 
 // Reload and re-render the layout when a layout-affecting config key changes
-// (lock, newtab, show_root, number_* — see config/storage.js).
+// (lock, newtab, show_root, number_* — see config/config.js).
 on(Events.COLUMNS_CHANGED, loadColumns);
 
 // Show/hide a special node or top-level bookmark folder from the grid.

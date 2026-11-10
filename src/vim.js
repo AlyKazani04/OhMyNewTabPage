@@ -1,5 +1,5 @@
 import { state, mutations } from './state.js';
-import { get, set, THEMES } from './config/index.js';
+import { get, set, THEMES, isLightActive } from './config/index.js';
 import {
   isRealBookmarkId,
   normalizeUrl,
@@ -120,14 +120,16 @@ export function vimDelete() {
 // Theme picker
 export function vimShowThemePicker() {
   const items = [];
-  const current = get('theme');
+  const light = isLightActive();
+  const slot = light ? 'theme_light' : 'theme';
+  const current = get(slot);
   const names = Object.keys(THEMES);
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
     items.push({
       label: (name === current ? '\u25cf ' : '  ') + name,
       selected: name === current,
-      action: () => { set('theme', name); },
+      action: () => { set(slot, name); },
     });
   }
   let x = 100, y = 100;

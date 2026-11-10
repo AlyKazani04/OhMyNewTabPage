@@ -27,10 +27,11 @@ function blocked() {
 
 export function initFinder() {
   document.addEventListener('keydown', (event) => {
-    if (!isShortcut(event) || blocked()) return;
-    const tag = event.target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (!isShortcut(event)) return;
+    // Ctrl+K belongs to the page: keep Chrome's omnibox search out even when the finder can't open
     event.preventDefault();
+    const tag = event.target.tagName;
+    if (blocked() || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     openFinder();
   });
 }

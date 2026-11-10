@@ -1,7 +1,8 @@
-import { get } from '../config/storage.js';
-import * as chromeApi from '../core/chrome-api.js';
-import { state } from '../core/state.js';
+import { get } from '../config/config.js';
+import * as chromeApi from '../chrome-api.js';
+import { emit, Events } from '../events.js';
 
+// ----- SPECIAL_NODES -----
 // Virtual (non-bookmark) top-level entries
 export const SPECIAL = {
   apps: {
@@ -73,7 +74,7 @@ function getClosed(callback) {
           action: () => {
             chromeApi.restoreSession(
               session.window ? session.window.sessionId : session.tab.sessionId
-            ).then(refreshClosed);
+            ).then(() => emit(Events.CLOSED_REFRESH));
             return false;
           },
         });
@@ -114,36 +115,8 @@ function getDevices(callback) {
   );
 }
 
-// Refresh recently closed tab lists
-export function refreshClosed() {
-  const targets = [];
-  const folders = document.getElementsByClassName('closed');
-  for (let i = 0; i < folders.length; i++) {
-    const a = folders[i];
-    if (a.nextSibling) {
-      a.parentNode.removeChild(a.nextSibling);
-      targets.push(a.parentNode);
-    }
-  }
-  if (folders.length === 0 && state.coords && state.coords['closed']) {
-    const target = document.getElementsByClassName('column')[state.coords['closed'].x];
-    target.removeChild(target.firstChild);
-    targets.push(target);
-  }
+// Refresh recently closed tab lists lives in render.js: it is DOM work, and
+// keeping it here forced this module to import render.js (and tree.js), which
+// is what closed the last import cycle. This module now only defines virtual
+// nodes and fetches their children; restoring a session emits CLOSED_REFRESH.
 
-  if (!getChildrenFunction || !renderAll) return;
-  getChildrenFunction({ id: 'closed' })((result) => {
-    for (let i = 0; i < targets.length; i++) renderAll(result, targets[i]);
-  });
-}
-
-let getChildrenFunction = null;
-let renderAll = null;
-
-export function setGetChildrenFunction(fn) {
-  getChildrenFunction = fn;
-}
-
-export function setRenderAll(fn) {
-  renderAll = fn;
-}

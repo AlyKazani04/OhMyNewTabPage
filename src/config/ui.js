@@ -1,8 +1,6 @@
-import { get, set, loadAll, currentTheme, applyLegacyThemeMode, MIGRATED_KEY } from './storage.js';
-import { DEFAULTS, getThemeNames } from './schema.js';
-import { emit, Events, on } from '../core/events.js';
-import * as chromeApi from '../core/chrome-api.js';
-import { getAllCSS, initCssVars } from './styles.js';
+import { get, set, loadAll, currentTheme, DEFAULTS, getThemeNames, getAllCSS, initCssVars, applyLegacyThemeMode, MIGRATED_KEY } from './config.js';
+import { emit, Events, on } from '../events.js';
+import * as chromeApi from '../chrome-api.js';
 
 let settingsInitialized = false;
 
@@ -165,7 +163,7 @@ export function initSettings() {
     // Load settings (applies theme + all styles)
     loadAll();
 
-    // Populate theme selector
+    // Populate theme selectors
     for (const key of ["theme", "theme_light"]) {
       const select = document.getElementById("options_" + key);
       if (select.childNodes.length === 0) {

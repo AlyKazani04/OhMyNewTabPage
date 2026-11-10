@@ -1,11 +1,10 @@
-import { state, mutations } from '../core/state.js';
-import { get } from '../config/storage.js';
-import { DEFAULTS } from '../config/schema.js';
-import { SPECIAL, specialKeys, isSpecial } from './special-nodes.js';
-import { getChildrenFunction } from './tree.js';
-import * as chromeApi from '../core/chrome-api.js';
-import { emit, Events, on } from '../core/events.js';
+import * as chromeApi from '../chrome-api.js';
+import { on, Events, emit } from '../events.js';
+import { mutations, state } from '../state.js';
+import { SPECIAL, specialKeys } from './special-nodes.js';
+import { get, DEFAULTS } from '../config/config.js';
 
+// ----- LAYOUT -----
 // Initialize SPECIAL in state
 mutations.setSpecial(SPECIAL);
 
@@ -210,7 +209,10 @@ export function inColumns(id) {
   return false;
 }
 
-// Sync layout after paste
+// Sync layout after paste. Deliberately does not touch cursor state: the
+// caller (vim.js) schedules the restore, so this module stays free of any
+// vim dependency. It used to call scheduleRestore here without importing it,
+// which threw a ReferenceError on the flat-column and top-level paths.
 export function syncLayoutAfterPaste(ids, parentId, below) {
   // Flattened column: a lone root folder rendered as its own contents
   let flatX = -1;
@@ -223,11 +225,9 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
     }
   }
   if (flatX > -1) {
-    scheduleRestore(ids[0]);
     saveColumns(); // triggers the re-render
   } else if (state.vimEl && state.vimEl._vimNode && state.coords && state.coords[state.vimEl._vimNode.id]) {
     // Top level (stored in the layout grid): land the cursor on the first pasted item once rendered
-    scheduleRestore(ids[0]);
     const pos = state.coords[state.vimEl._vimNode.id];
     placeInLayout(ids, pos.x, below ? pos.y + 1 : pos.y);
   } else {
@@ -237,15 +237,15 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
   }
 }
 
-export let scheduleRestore = null;
-export let renderColumns = null;
-
-export function setScheduleRestore(fn) { scheduleRestore = fn; }
-export function setRenderColumns(fn) { renderColumns = fn; }
-
 // Reload and re-render the layout when a layout-affecting config key changes
-// (lock, newtab, show_root, number_* — see config/storage.js).
+// (lock, newtab, show_root, number_* — see config/config.js).
 on(Events.COLUMNS_CHANGED, loadColumns);
+
+// A bookmark fetch failed, so the node no longer exists — drop its grid entry.
+// tree.js reports the miss; deciding what it means for the grid is layout's job.
+on(Events.BOOKMARK_MISSING, (id) => {
+  if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
+});
 
 // Show/hide a special node or top-level bookmark folder from the grid.
 // Mirrors the legacy setConfig "show_*" handling: hiding removes the row,
@@ -258,3 +258,4 @@ on('bookmarks:visibility', ({ id, visible }) => {
     saveColumns();
   }
 });
+

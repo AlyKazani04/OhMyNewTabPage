@@ -31,6 +31,13 @@ export function once(event, handler) {
     handler(data);
   });
   return unsub;
+}
+
+// Number of handlers registered for an event. Lets tests assert wiring
+// (e.g. that importing a module registers nothing) without reaching into `handlers`.
+export function listenerCount(event) {
+  const set = handlers.get(event);
+  return set ? set.size : 0;
 };
 
 export const Events = {
@@ -54,6 +61,10 @@ export const Events = {
   BOOKMARK_UPDATED: 'bookmark:updated',
   BOOKMARK_DELETED: 'bookmark:deleted',
   BOOKMARK_MOVED: 'bookmark:moved',
+  BOOKMARK_MISSING: 'bookmark:missing',
+
+  // Special nodes
+  CLOSED_REFRESH: 'closed:refresh',
 
   // Config
   CONFIG_CHANGED: 'config:changed',

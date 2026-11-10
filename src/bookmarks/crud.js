@@ -1,15 +1,11 @@
-import * as chromeApi from '../core/chrome-api.js';
-import { state, mutations } from '../core/state.js';
-import { get } from '../config/storage.js';
-import { SPECIAL, isSpecial } from './special-nodes.js';
+import * as chromeApi from '../chrome-api.js';
+import { isSpecial } from './special-nodes.js';
+import { state } from '../state.js';
+import { emit, Events } from '../events.js';
+import { renderColumns } from '../render.js';
 import { removeFromLayout, saveColumns } from './layout.js';
 
-let renderColumnsFn = null;
-let scheduleRestoreFn = null;
-
-export function setRenderColumnsForCrud(fn) { renderColumnsFn = fn; }
-export function setScheduleRestoreForCrud(fn) { scheduleRestoreFn = fn; }
-
+// ----- CRUD -----
 // Check if ID is a real bookmark (numeric)
 export function isRealBookmarkId(id) {
   return /^\d+$/.test(String(id));
@@ -60,13 +56,21 @@ export function getInsertionContext() {
 export async function createBookmarkAt(props, afterId) {
   const finish = async (index) => {
     if (index != null) props.index = index;
-    const result = await chromeApi.bmCreate(props);
+    let result;
+    try {
+      result = await chromeApi.bmCreate(props);
+    } catch (err) {
+      // chrome-api.js rejects when chrome.runtime.lastError is set, so the
+      // `!result` guard below is the second failure mode, not the first.
+      console.warn('create failed:', err?.message || err);
+      return;
+    }
     if (!result) {
       console.warn('create failed');
-    } else if (scheduleRestoreFn) {
-      scheduleRestoreFn(result.id);
+      return;
     }
-    if (renderColumnsFn) renderColumnsFn();
+    emit(Events.BOOKMARK_CREATED, result.id);
+    renderColumns();
   };
   if (!afterId) return finish(null);
   const results = await chromeApi.bmGet(afterId);
@@ -81,27 +85,34 @@ export async function createBookmarkAt(props, afterId) {
 
 // Update bookmark
 export async function updateBookmark(id, props) {
-  await chromeApi.bmUpdate(id, props);
-  if (chrome.runtime.lastError) {
-    console.warn('edit failed:', chrome.runtime.lastError.message);
-  } else if (scheduleRestoreFn) {
-    scheduleRestoreFn(id);
+  try {
+    await chromeApi.bmUpdate(id, props);
+  } catch (err) {
+    // chrome-api.js rejects on lastError, so a post-await `lastError` check
+    // here could never be true — it was dead code.
+    console.warn('edit failed:', err?.message || err);
+    return;
   }
-  if (renderColumnsFn) renderColumnsFn();
+  emit(Events.BOOKMARK_UPDATED, id);
+  renderColumns();
 }
 
-// Delete bookmarks by IDs
+// Delete bookmarks by IDs. One failure must not abort the rest of the batch.
 export async function deleteBookmarksByIds(ids) {
   for (let i = 0; i < ids.length; i++) {
-    const results = await chromeApi.bmGet(ids[i]);
-    if (!results || !results[0]) continue;
-    if (results[0].url) {
-      await chromeApi.bmRemove(ids[i]);
-    } else {
-      await chromeApi.bmRemoveTree(ids[i]);
+    let results;
+    try {
+      results = await chromeApi.bmGet(ids[i]);
+    } catch (err) {
+      console.warn('delete failed:', err?.message || err);
+      continue;
     }
-    if (chrome.runtime.lastError) {
-      console.warn('delete failed:', chrome.runtime.lastError.message);
+    if (!results || !results[0]) continue;
+    try {
+      if (results[0].url) await chromeApi.bmRemove(ids[i]);
+      else await chromeApi.bmRemoveTree(ids[i]);
+    } catch (err) {
+      console.warn('delete failed:', err?.message || err);
     }
   }
   // Prune layout entries for deleted top-level items
@@ -109,9 +120,8 @@ export async function deleteBookmarksByIds(ids) {
   if (topLevel.length > 0) {
     removeFromLayout(topLevel);
     saveColumns();
-  } else if (renderColumnsFn) {
-    renderColumnsFn();
   }
+  renderColumns();
 }
 
 // Move bookmark
@@ -157,3 +167,4 @@ export async function folderMoveDrop(dragIds, folderNodeId) {
 export function clipTargetableId(id) {
   return isRealBookmarkId(id) && Array.isArray(state.root) && state.root.indexOf(id) < 0;
 }
+

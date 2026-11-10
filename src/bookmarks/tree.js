@@ -1,7 +1,9 @@
-import * as chromeApi from '../core/chrome-api.js';
-import { SPECIAL, isSpecial, getSpecialNode } from './special-nodes.js';
-import { state, mutations } from '../core/state.js';
+import * as chromeApi from '../chrome-api.js';
+import { emit, Events } from '../events.js';
+import { isSpecial, getSpecialNode } from './special-nodes.js';
 
+
+// ----- TREE -----
 // Gets function that returns children of node
 export function getChildrenFunction(node) {
   if (isSpecial(node.id)) {
@@ -17,13 +19,14 @@ export function getChildrenFunction(node) {
       (result) => {
         if (result) callback(result[0].children);
         else {
-          // remove missing bookmark locations
-          if (state.coords[node.id]) removeRow(state.coords[node.id].x, state.coords[node.id].y);
+          // The bookmark is gone. Report it and let the layout layer drop the
+          // grid entry — tree.js must not reach into layout state.
+          emit(Events.BOOKMARK_MISSING, node.id);
           callback([]);
         }
       },
       () => {
-        if (state.coords[node.id]) removeRow(state.coords[node.id].x, state.coords[node.id].y);
+        emit(Events.BOOKMARK_MISSING, node.id);
         callback([]);
       }
     );
@@ -43,20 +46,9 @@ export function getSubTree(id, callback) {
   chromeApi.bmGetSubTree(id).then(
     (result) => {
       if (result) callback(result);
-      else {
-        // remove missing bookmark locations
-        if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
-      }
+      else emit(Events.BOOKMARK_MISSING, id);
     },
-    () => {
-      if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
-    }
+    () => emit(Events.BOOKMARK_MISSING, id)
   );
 }
 
-// These will be set by layout module
-let removeRow = null;
-
-export function setRemoveRow(fn) {
-  removeRow = fn;
-}

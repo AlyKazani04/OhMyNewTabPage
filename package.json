@@ -1,6 +1,6 @@
 {
   "name": "oh-my-new-tab-page",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "homepage": "https://github.com/AlyKazani04/OhMyNewTabPage#readme",
   "bugs": {
     "url": "https://github.com/AlyKazani04/OhMyNewTabPage/issues"
@@ -16,11 +16,13 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "esbuild src/entry.js --bundle --outfile=temp_output.js --format=iife --global-name=OMNTP --minify --sourcemap --target=chrome104",
+    "build": "esbuild src/entry.js --bundle --outfile=output.js --format=iife --global-name=OMNTP --minify --sourcemap --target=chrome104",
     "dev": "npm run build -- --watch",
-    "test": "echo 'Manual: Load unpacked extension in Chrome'"
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:watch": "npm test -- --watch"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "jsdom": "^31.0.0"
   }
 }

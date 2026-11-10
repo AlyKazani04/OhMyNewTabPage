@@ -1,9 +1,11 @@
 // ----- FINDER -----
 // Ctrl+K / Cmd+K bookmark finder overlay
 import { bmGetTree } from './chrome-api.js';
-import { openLink, getIcon } from './render.js';
+import { openLink, getIcon, toggle } from './render.js';
+import { getVisibleLinks, updateCursorVisuals } from './vim.js';
+import { state, mutations } from './state.js';
 import { get } from './config/config.js';
-import { buildIndex, rankEntries } from './finder-match.js';
+import { buildIndex, rankEntries, pickColumn } from './finder-match.js';
 
 const HINT = 'Enter open · Ctrl+Enter background · Tab reveal · Esc close';
 
@@ -157,7 +159,65 @@ async function openFinder() {
   input.focus();
 }
 
-// Reveal the entry in the column layout (Task 3); for now only closes the overlay
+let noticeTimer = null;
+
+// Transient message at the bottom of the page
+function showNotice(text) {
+  const old = document.querySelector('.finder-notice');
+  if (old) old.remove();
+  clearTimeout(noticeTimer);
+  const notice = document.createElement('div');
+  notice.className = 'finder-notice';
+  notice.setAttribute('role', 'status');
+  notice.textContent = text;
+  document.body.appendChild(notice);
+  noticeTimer = setTimeout(() => notice.remove(), 2500);
+}
+
+// Anchor for id inside scope; polls briefly in case children render late
+async function findAnchor(scope, id) {
+  const end = performance.now() + 2000;
+  for (;;) {
+    for (const a of scope.querySelectorAll('a')) if (a._vimNode && a._vimNode.id === id) return a;
+    if (performance.now() > end) return null;
+    await new Promise(requestAnimationFrame);
+  }
+}
+
+// Open the entry's ancestor folders in its column and put the vim cursor on it
 async function revealEntry(entry, openFolder) {
   if (close) close();
+  const chain = [...entry.ancestors, entry.node.id];
+  const pick = pickColumn(chain, state.columns, !!get('show_root'));
+  if (!pick) {
+    showNotice('Not shown in your layout');
+    return;
+  }
+  const col = document.getElementsByClassName('column')[pick.x];
+  if (pick.start === chain.length) {
+    mutations.setVimCursor(pick.x, 0);
+    updateCursorVisuals();
+    return;
+  }
+  // Each step searches only under the previous anchor, so a stale copy elsewhere
+  // (the Recent bookmarks section, or the item's old folder) is never picked.
+  let scope = col;
+  for (const id of chain.slice(pick.start, -1)) {
+    const a = scope && await findAnchor(scope, id);
+    if (!a) {
+      showNotice("Couldn't reveal it — reload the page");
+      return;
+    }
+    if (!a.open) toggle(a._vimNode, a);
+    scope = a.parentNode;
+  }
+  const target = scope && await findAnchor(scope, entry.node.id);
+  const index = target ? getVisibleLinks(pick.x).indexOf(target) : -1;
+  if (index < 0) {
+    showNotice("Couldn't reveal it — reload the page");
+    return;
+  }
+  mutations.setVimCursor(pick.x, index);
+  updateCursorVisuals();
+  if (openFolder && entry.isFolder && !target.open) toggle(target._vimNode, target);
 }

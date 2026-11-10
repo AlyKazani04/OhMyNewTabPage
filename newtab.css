@@ -660,3 +660,17 @@ input[type="file"]::-webkit-file-upload-button {
   font-size: 0.8em;
   opacity: 0.6;
 }
+.finder-notice {
+  position: fixed;
+  bottom: 2em;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 0.5em 1em;
+  color: var(--font-color);
+  font-size: 1.2em;
+  background-color: var(--background-color);
+  border: solid 1px var(--highlight-color);
+  border-radius: var(--highlight-round);
+  box-shadow: 0 0 var(--shadow-blur) var(--shadow-color);
+}

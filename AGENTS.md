@@ -59,10 +59,11 @@ There is **no dependency injection**. Modules import each other directly; `confi
 2. `config.loadAll()` — loads config, runs the theme migration, applies CSS vars.
 3. `interaction.initKeyboard()` — attaches the global keydown handler.
 4. `vimInit()` — registers the vim event wiring and observes `#main` so the cursor follows re-renders.
-5. `?options` handling — opens the panel if the URL requests it.
-6. `#options_button` click → `config.showOptions(true)`.
-7. `on(RENDER_REQUESTED, …)` → `render.renderColumns()`.
-8. `bookmarks.loadColumns()` — fetches the bookmarks root, builds the grid, emits `RENDER_REQUESTED`.
+5. `initFinder()` — attaches the Ctrl+K finder keydown listener (`finder.js` is imported only here).
+6. `?options` handling — opens the panel if the URL requests it.
+7. `#options_button` click → `config.showOptions(true)`.
+8. `on(RENDER_REQUESTED, …)` → `render.renderColumns()`.
+9. `bookmarks.loadColumns()` — fetches the bookmarks root, builds the grid, emits `RENDER_REQUESTED`.
 
 `loadColumns()` runs last; without it nothing renders.
 

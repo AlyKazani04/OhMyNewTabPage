@@ -2,7 +2,9 @@ export const DEFAULTS = {
   font: "Sans-serif",
   font_size: 16,
   font_weight: 400,
+  theme_mode: "System",
   theme: "Nord",
+  theme_light: "Nord Light",
   font_color: "#555555",
   background_color: "#ffffff",
   highlight_color: "#e4f4ff",
@@ -57,6 +59,9 @@ export const THEMES = {
   Solitude: { font_color: "#cacccc", background_color: "#101315", highlight_color: "#798186", highlight_font_color: "#101315", shadow_color: "#0c0e10" },
 };
 
+// Themes used when a saved theme predates theme_mode (migration)
+export const LIGHT_THEMES = ["Catppuccin Latte", "Rosé Pine Dawn", "Tokyo Night Day", "Nord Light"];
+
 // Validation: returns normalized value or throws
 export function validate(key, value) {
   const def = DEFAULTS[key];
@@ -64,6 +69,7 @@ export function validate(key, value) {
   if (value === null || value === undefined) return def;
   if (typeof def === "number") return Number(value);
   if (typeof def === "boolean") return Boolean(value);
+  if (key === "theme_mode") return ["System", "Light", "Dark"].includes(String(value)) ? String(value) : def;
   return String(value);
 }
 

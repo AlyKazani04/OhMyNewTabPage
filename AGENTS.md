@@ -29,6 +29,8 @@ src/
 ├── render.js        # renderColumns/renderColumn/renderAll/toggle/animate/tooltips
 ├── overlay.js       # Modal dialog + popup menu (imports nothing — cannot cycle)
 ├── interaction.js   # Keyboard, drag-drop, context menu item lists
+├── finder.js        # Ctrl+K finder overlay: keys, results, open/reveal (imported only by entry.js)
+├── finder-match.js  # Pure index/fuzzy-match/ranking helpers for the finder (no imports)
 └── vim.js           # Cursor, selection, yank/cut/paste, theme picker, dialogs
 ```
 
@@ -115,3 +117,4 @@ There is **no dependency injection**. Modules import each other directly; `confi
 - [ ] Settings persist across reloads
 - [ ] Import/export settings
 - [ ] Recently closed refreshes on session change
+- [ ] Finder (Ctrl+K) searches, opens and reveals

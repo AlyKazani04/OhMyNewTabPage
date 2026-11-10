@@ -1,0 +1,163 @@
+// ----- FINDER -----
+// Ctrl+K / Cmd+K bookmark finder overlay
+import { bmGetTree } from './chrome-api.js';
+import { openLink, getIcon } from './render.js';
+import { get } from './config/config.js';
+import { buildIndex, rankEntries } from './finder-match.js';
+
+const HINT = 'Enter open · Ctrl+Enter background · Tab reveal · Esc close';
+
+let close = null; // set while the overlay is open
+let opening = false;
+
+function isShortcut(event) {
+  return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+}
+
+export function initFinder() {
+  document.addEventListener('keydown', (event) => {
+    if (!isShortcut(event)) return;
+    if (document.getElementById('options').style.display === 'block') return;
+    if (document.querySelector('.menu') || document.querySelector('.vim-modal-backdrop')) return;
+    const tag = event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    event.preventDefault();
+    openFinder();
+  });
+}
+
+// Text with <mark> around the given indices, built from text nodes only
+function highlight(el, text, positions) {
+  const marked = new Set(positions);
+  let i = 0;
+  while (i < text.length) {
+    const isMark = marked.has(i);
+    let j = i;
+    while (j < text.length && marked.has(j) === isMark) j++;
+    const chunk = document.createTextNode(text.slice(i, j));
+    if (isMark) {
+      const mark = document.createElement('mark');
+      mark.appendChild(chunk);
+      el.appendChild(mark);
+    } else el.appendChild(chunk);
+    i = j;
+  }
+}
+
+async function openFinder() {
+  if (close || opening) return;
+  opening = true;
+  const prevFocus = document.activeElement;
+  let entries;
+  try {
+    entries = buildIndex(await bmGetTree());
+  } catch (err) {
+    console.warn('Failed to read bookmarks:', err);
+    return;
+  } finally {
+    opening = false;
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'vim-modal-backdrop finder-backdrop';
+  const panel = document.createElement('div');
+  panel.className = 'finder';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'finder-input';
+  input.placeholder = 'Search bookmarks…';
+  input.setAttribute('aria-label', 'Search bookmarks');
+  const list = document.createElement('ul');
+  list.className = 'finder-results';
+  const hint = document.createElement('div');
+  hint.className = 'finder-hint';
+  hint.textContent = HINT;
+  panel.append(input, list, hint);
+  backdrop.appendChild(panel);
+
+  let results = [];
+  let selected = 0;
+
+  function select(index) {
+    const rows = list.children;
+    if (!rows.length) return;
+    if (rows[selected]) rows[selected].classList.remove('selected');
+    selected = Math.max(0, Math.min(index, rows.length - 1));
+    rows[selected].classList.add('selected');
+    rows[selected].scrollIntoView({ block: 'nearest' });
+  }
+
+  function renderResults() {
+    results = rankEntries(input.value, entries);
+    list.textContent = '';
+    results.forEach((result, i) => {
+      const { entry, highlights } = result;
+      const li = document.createElement('li');
+      li.className = 'finder-row';
+      if (entry.isFolder) li.classList.add('folder');
+      li.appendChild(getIcon(entry.node));
+      const title = document.createElement('span');
+      title.className = 'finder-title';
+      highlight(title, entry.title, highlights.title);
+      const path = document.createElement('span');
+      path.className = 'finder-path';
+      highlight(path, entry.path, highlights.path);
+      li.append(title, path);
+      li.onclick = () => { select(i); activate(false); };
+      list.appendChild(li);
+    });
+    selected = 0;
+    select(0);
+  }
+
+  function activate(background) {
+    const result = results[selected];
+    if (!result) return;
+    const { entry } = result;
+    if (entry.isFolder) {
+      if (!background) revealEntry(entry, true);
+      return;
+    }
+    closeFinder();
+    openLink(entry.node, background ? 2 : get('newtab'));
+  }
+
+  function onKeyDown(event) {
+    let handled = true;
+    if (isShortcut(event) || event.key === 'Escape') closeFinder();
+    else if (event.key === 'ArrowDown') select(selected + 1);
+    else if (event.key === 'ArrowUp') select(selected - 1);
+    else if (event.key === 'Tab' || (event.key === 'Enter' && event.shiftKey)) {
+      if (results[selected]) revealEntry(results[selected].entry, false);
+    } else if (event.key === 'Enter') activate(event.ctrlKey || event.metaKey);
+    else handled = false;
+    if (handled) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  function closeFinder() {
+    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    document.removeEventListener('keydown', onKeyDown, true);
+    close = null;
+    if (prevFocus && prevFocus.isConnected && prevFocus.focus) prevFocus.focus();
+  }
+
+  input.addEventListener('input', renderResults);
+  // Keep focus in the input when clicking rows; clicking the dim area closes
+  backdrop.onmousedown = (event) => {
+    if (event.target === backdrop) closeFinder();
+    return false;
+  };
+
+  close = closeFinder;
+  document.addEventListener('keydown', onKeyDown, true);
+  document.body.appendChild(backdrop);
+  input.focus();
+}
+
+// Reveal the entry in the column layout (Task 3); for now only closes the overlay
+async function revealEntry(entry, openFolder) {
+  if (close) close();
+}

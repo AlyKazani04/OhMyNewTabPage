@@ -88,6 +88,7 @@ Designed with speed in mind, OhMyNewTabPage allows you to stay entirely* on your
 |           `e`            | Edit bookmark or folder                      |
 |           `d`            | Delete bookmark or folder (asks to confirm)  |
 |           `T`            | Open the theme picker                        |
+|         `Ctrl+K`         | Open the bookmark finder                     |
 |           `/`            | Open the options panel (`Esc` closes it)     |
 |          `Esc`           | Clear selection / cancel cut                 |
 

@@ -15,6 +15,14 @@ export function bmGetSubTree(id) {
   });
 }
 
+export function bmGetTree() {
+  return new Promise((resolve, reject) => {
+    chrome.bookmarks.getTree((result) => {
+      chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(result);
+    });
+  });
+}
+
 export function bmCreate(props) {
   return new Promise((resolve, reject) => {
     chrome.bookmarks.create(props, (result) => {

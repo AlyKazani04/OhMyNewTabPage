@@ -574,3 +574,89 @@ input[type="file"]::-webkit-file-upload-button {
     font-size: 1em;
   }
 }
+
+/* Finder */
+.finder {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40em;
+  max-width: calc(100% - 2em);
+  box-sizing: border-box;
+  padding: 0.6em;
+  color: var(--font-color);
+  font-size: 1.4em;
+  line-height: normal;
+  text-align: left;
+  background-color: var(--background-color);
+  border: solid 1px var(--highlight-color);
+  border-radius: var(--highlight-round);
+  box-shadow: 0 0 var(--shadow-blur) var(--shadow-color);
+}
+.finder-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.4em 0.5em;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: solid 1px var(--font-color);
+  border-radius: var(--highlight-round);
+}
+.finder-input:focus {
+  outline: none;
+  border-color: var(--highlight-color);
+}
+.finder-results {
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0.4em 0 0;
+  padding: 0;
+  list-style: none;
+}
+.finder-row {
+  display: flex;
+  align-items: center;
+  padding: 0.3em 0.5em;
+  white-space: nowrap;
+  border-radius: var(--highlight-round);
+  cursor: pointer;
+}
+.finder-row .icon {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.finder-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.finder-path {
+  flex: 1;
+  min-width: 0;
+  margin-left: 1em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  opacity: 0.6;
+}
+.finder mark {
+  color: var(--highlight-color);
+  background: transparent;
+  font-weight: bold;
+}
+.finder-row.selected {
+  color: var(--background-color);
+  background-color: var(--highlight-color);
+}
+.finder-row.selected mark {
+  color: inherit;
+  text-decoration: underline;
+}
+.finder-hint {
+  margin-top: 0.4em;
+  font-size: 0.8em;
+  opacity: 0.6;
+}

@@ -13,14 +13,21 @@ let close = null; // set while the overlay is open
 let opening = false;
 
 function isShortcut(event) {
-  return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+  if (!event.ctrlKey && !event.metaKey) return false;
+  const key = event.key.toLowerCase();
+  // Non-Latin layouts (Russian, Greek, Hebrew) report the layout letter; fall back to the physical key
+  return key === 'k' || (!/^[a-z]$/.test(key) && event.code === 'KeyK');
+}
+
+// The options panel, a context menu or a dialog owns the keyboard
+function blocked() {
+  return document.getElementById('options').style.display === 'block' ||
+    !!document.querySelector('.menu, .vim-modal-backdrop');
 }
 
 export function initFinder() {
   document.addEventListener('keydown', (event) => {
-    if (!isShortcut(event)) return;
-    if (document.getElementById('options').style.display === 'block') return;
-    if (document.querySelector('.menu') || document.querySelector('.vim-modal-backdrop')) return;
+    if (!isShortcut(event) || blocked()) return;
     const tag = event.target.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     event.preventDefault();
@@ -52,7 +59,10 @@ async function openFinder() {
   const prevFocus = document.activeElement;
   let entries;
   try {
-    entries = buildIndex(await bmGetTree());
+    const tree = await bmGetTree();
+    // Keys typed while reading the tree may have opened something else
+    if (blocked()) return;
+    entries = buildIndex(tree);
   } catch (err) {
     console.warn('Failed to read bookmarks:', err);
     return;
@@ -64,6 +74,9 @@ async function openFinder() {
   backdrop.className = 'vim-modal-backdrop finder-backdrop';
   const panel = document.createElement('div');
   panel.className = 'finder';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'Bookmark finder');
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'finder-input';
@@ -71,6 +84,7 @@ async function openFinder() {
   input.setAttribute('aria-label', 'Search bookmarks');
   const list = document.createElement('ul');
   list.className = 'finder-results';
+  list.setAttribute('role', 'listbox');
   const hint = document.createElement('div');
   hint.className = 'finder-hint';
   hint.textContent = HINT;
@@ -82,10 +96,15 @@ async function openFinder() {
 
   function select(index) {
     const rows = list.children;
-    if (!rows.length) return;
-    if (rows[selected]) rows[selected].classList.remove('selected');
+    if (!rows.length) return input.removeAttribute('aria-activedescendant');
+    if (rows[selected]) {
+      rows[selected].classList.remove('selected');
+      rows[selected].setAttribute('aria-selected', 'false');
+    }
     selected = Math.max(0, Math.min(index, rows.length - 1));
     rows[selected].classList.add('selected');
+    rows[selected].setAttribute('aria-selected', 'true');
+    input.setAttribute('aria-activedescendant', rows[selected].id);
     rows[selected].scrollIntoView({ block: 'nearest' });
   }
 
@@ -96,6 +115,9 @@ async function openFinder() {
       const { entry, highlights } = result;
       const li = document.createElement('li');
       li.className = 'finder-row';
+      li.id = 'finder-row-' + i;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
       if (entry.isFolder) li.classList.add('folder');
       li.appendChild(getIcon(entry.node));
       const title = document.createElement('span');
@@ -103,9 +125,15 @@ async function openFinder() {
       highlight(title, entry.title, highlights.title);
       const path = document.createElement('span');
       path.className = 'finder-path';
-      highlight(path, entry.path, highlights.path);
+      // Isolated so the rtl box (which clips at the start) keeps the path's own text order
+      const pathText = document.createElement('bdi');
+      highlight(pathText, entry.path, highlights.path);
+      path.appendChild(pathText);
       li.append(title, path);
-      li.onclick = () => { select(i); activate(false); };
+      li.onclick = (event) => { select(i); activate(event.ctrlKey || event.metaKey); };
+      li.onauxclick = (event) => {
+        if (event.button === 1) { select(i); activate(true); }
+      };
       list.appendChild(li);
     });
     selected = 0;
@@ -149,10 +177,11 @@ async function openFinder() {
   }
 
   input.addEventListener('input', renderResults);
-  // Keep focus in the input when clicking rows; clicking the dim area closes
+  // Keep focus in the input when clicking rows (the input itself keeps caret and
+  // selection behavior); clicking the dim area closes
   backdrop.onmousedown = (event) => {
     if (event.target === backdrop) closeFinder();
-    return false;
+    return event.target === input;
   };
 
   close = closeFinder;

@@ -641,6 +641,8 @@ input[type="file"]::-webkit-file-upload-button {
   margin-left: 1em;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* rtl clips the start, so the nearest parent folder stays visible */
+  direction: rtl;
   text-align: right;
   opacity: 0.6;
 }

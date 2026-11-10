@@ -27,10 +27,14 @@ export function buildIndex(roots) {
   return out;
 }
 
+// Lowercase without changing length, so indexes in t still point into text:
+// toLowerCase() turns 'İ' into two code units. 'ı' folds too, so 'ışık' finds 'IŞIK'.
+const fold = s => s.replace(/İ/g, 'i').toLowerCase().replace(/ı/g, 'i');
+
 // Single-term, case-insensitive, in-order match (fzf v1 style)
 export function fuzzyMatch(query, text) {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
+  const q = fold(query);
+  const t = fold(text);
   if (!q) return null;
   let qi = 0;
   let end = -1;

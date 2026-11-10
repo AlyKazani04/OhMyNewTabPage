@@ -201,14 +201,15 @@ export function getIcon(node) {
 }
 
 // ----- TOOLTIPS -----
-let tooltipTimeout = null;
+// The debounce handle lives on `state.tooltipTimeout` (see state.js) rather than
+// in a module-private binding.
 
 // Adds tooltips to truncated text
 export function updateTooltips() {
-  if (tooltipTimeout) clearTimeout(tooltipTimeout);
+  if (state.tooltipTimeout) clearTimeout(state.tooltipTimeout);
 
-  tooltipTimeout = setTimeout(() => {
-    tooltipTimeout = null;
+  state.tooltipTimeout = setTimeout(() => {
+    state.tooltipTimeout = null;
     const elements = document.querySelectorAll('#main li a');
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i];

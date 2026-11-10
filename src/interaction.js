@@ -176,20 +176,20 @@ export function addColumnHandlers(index, target) {
 }
 
 // ----- DRAG_N_DROP -----
-let dragIds = null;
-let dropTarget = null;
+// Drag state lives on `state.drag` (see state.js) rather than in module-private
+// bindings, so there is exactly one place mutable state lives.
 
 // Enable drag and drop of column
 export function enableDragColumn(id, column) {
   if (get('lock')) return;
   column.draggable = true;
   column.ondragstart = (event) => {
-    dragIds = state.columns[id];
+    state.drag.ids = state.columns[id];
     event.dataTransfer.effectAllowed = 'move';
     column.classList.add('dragstart');
   };
   column.ondragend = () => {
-    dragIds = null;
+    state.drag.ids = null;
     column.classList.remove('dragstart');
     clearDropTarget();
   };
@@ -200,13 +200,13 @@ export function enableDragFolder(node, anchor) {
   if (get('lock')) return;
   anchor.draggable = true;
   anchor.ondragstart = (event) => {
-    dragIds = [node.id];
+    state.drag.ids = [node.id];
     event.stopPropagation();
     event.dataTransfer.effectAllowed = 'move copy';
     anchor.classList.add('dragstart');
   };
   anchor.ondragend = () => {
-    dragIds = null;
+    state.drag.ids = null;
     anchor.classList.remove('dragstart');
     clearDropTarget();
   };
@@ -228,7 +228,7 @@ export function enableDragDrop() {
     const target = getDropTarget(event);
     if (target) {
       clearDropTarget();
-      dropTarget = target;
+      state.drag.target = target;
       const bordercss = 'solid 2px ' + get('font_color');
       if (target.tagName === 'LI' || target.tagName === 'UL') {
         if (isAbove(event.pageY, target)) {
@@ -262,7 +262,7 @@ export function enableDragDrop() {
 
     // Drop into a folder container
     if (target.tagName === 'A' && target.classList.contains('folder')) {
-      folderMoveDrop(dragIds, target._vimNode ? target._vimNode.id : null);
+      folderMoveDrop(state.drag.ids, target._vimNode ? target._vimNode.id : null);
       return false;
     }
 
@@ -270,10 +270,10 @@ export function enableDragDrop() {
     let x = getDropX(target, event);
     const y = getDropY(target, event);
 
-    if (dragIds.length === 1 && y != null) addRow(dragIds[0], x, y);
+    if (state.drag.ids.length === 1 && y != null) addRow(state.drag.ids[0], x, y);
     else {
       if (event.pageX - target.offsetLeft > target.clientWidth / 2) x++;
-      addColumn(dragIds, x);
+      addColumn(state.drag.ids, x);
     }
     return false;
   };
@@ -281,19 +281,19 @@ export function enableDragDrop() {
 
 // Gets proper drop target element
 export function getDropTarget(event) {
-  if (!dragIds) return null;
+  if (!state.drag.ids) return null;
   let target = event.target;
 
   // Dropping a single item directly on a folder header uses the folder as container
   let a = target && target.tagName === 'A' ? target :
     target.parentNode && target.parentNode.tagName === 'A' ? target.parentNode : null;
-  if (a && a.classList.contains('folder') && dragIds.length === 1) {
+  if (a && a.classList.contains('folder') && state.drag.ids.length === 1) {
     const rect = a.getBoundingClientRect();
     const cy = event.clientY;
     if (cy - rect.top > 6 && rect.bottom - cy > 6) return a;
   }
 
-  if (target && (target.tagName === 'A' || target.parentNode.tagName === 'A') && dragIds.length === 1) {
+  if (target && (target.tagName === 'A' || target.parentNode.tagName === 'A') && state.drag.ids.length === 1) {
     // Get parent folder until toplevel
     while (target && target.parentNode.parentNode && target.parentNode.parentNode.className !== 'column') {
       target = target.parentNode;
@@ -339,11 +339,11 @@ export function isAbove(pageY, target) {
 
 // Clears droptarget styles
 export function clearDropTarget() {
-  if (dropTarget) {
-    dropTarget.style.border = null;
-    dropTarget.style.margin = null;
+  if (state.drag.target) {
+    state.drag.target.style.border = null;
+    state.drag.target.style.margin = null;
   }
-  dropTarget = null;
+  state.drag.target = null;
 }
 
 // ----- RENDER WIRING -----

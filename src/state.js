@@ -12,6 +12,14 @@ export const state = {
   clipboard: { ids: [], mode: null },
   vimPendingRestore: null,
 
+  // Interaction / render state
+  // `drag` backs interaction.js's drag-drop handlers (ids being dragged, element
+  // currently highlighted as the drop target). `tooltipTimeout` is render.js's
+  // tooltip debounce handle — a timer id, not domain state, but keeping it here
+  // means nothing mutable lives in a module-private `let` binding.
+  drag: { ids: null, target: null },
+  tooltipTimeout: null,
+
 };
 
 // Derived/computed getters

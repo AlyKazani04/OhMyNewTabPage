@@ -20,7 +20,7 @@ A lightning-fast, keyboard-centric new tab page for power users. This project is
 - [x] **Vim Navigation** — Navigate your bookmarks and links seamlessly using intuitive keyboard shortcuts.
 - [x] **Theme Picker** — Switch instantly between popular aesthetic themes (Nord, Catppuccin, Rosé Pine, Tokyo Night, and more).
 - [x] **Cut, Copy & Paste for Bookmarks** — Easily rearrange and reorganize your bookmarked links directly from the keyboard or mouse.
-- [ ] **Automatic Theme Syncing** — Context-aware theme option that applies colors based on browser's color palette.
+- [x] **System/Light/Dark Mode** — Choose System, Light or Dark mode; System follows your OS/browser `prefers-color-scheme` and switches automatically, using separate Dark theme and Light theme pickers.
 - [ ] **Built-in Fuzzy Finder** — Quickly search and filter through all your bookmarks in real time.
 - [ ] **Custom Theme Support** — Create, customize, and apply your own custom color palettes.
 
@@ -43,7 +43,7 @@ OhMyNewTabPage ships with 14 built-in themes, with inspiration taken from [Omarc
 
 Press `T` to open the keyboard-accessible theme picker, or pick a theme in the options panel (`/`).
 
-Note: The themes do not auto-switch on Omarchy.
+In the options panel, set **Mode** to System, Light or Dark. In System mode the page follows your OS/browser color scheme (`prefers-color-scheme`) and switches live between your chosen **Dark theme** and **Light theme**. Light and Dark modes always use the corresponding picker's theme.
 
 ### Example
 

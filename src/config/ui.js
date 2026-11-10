@@ -1,4 +1,4 @@
-import { get, set, loadAll, currentTheme } from './storage.js';
+import { get, set, loadAll, currentTheme, applyLegacyThemeMode, MIGRATED_KEY } from './storage.js';
 import { DEFAULTS, getThemeNames } from './schema.js';
 import { emit, Events, on } from '../core/events.js';
 import * as chromeApi from '../core/chrome-api.js';
@@ -101,6 +101,11 @@ export function initSettings() {
         imports.onchange = () => {
           try {
             const imported = JSON.parse(imports.value);
+            // Pre-feature exports (no theme_mode, no marker, any options.*) predate theme_mode: derive it from the saved theme
+            const hasOptions = Object.keys(imported).some((k) => k.startsWith("options."));
+            if (hasOptions && imported["options.theme_mode"] == null && imported[MIGRATED_KEY] == null) {
+              applyLegacyThemeMode(imported);
+            }
             for (const k in imported) localStorage.setItem(k, imported[k]);
             imports.value = "";
             imports.placeholder = "Import successful!";
@@ -161,13 +166,15 @@ export function initSettings() {
     loadAll();
 
     // Populate theme selector
-    const select = document.getElementById("options_theme");
-    if (select.childNodes.length === 0) {
-      for (const name of getThemeNames()) {
-        const option = document.createElement("option");
-        option.textContent = name;
-        if (name === get("theme")) option.selected = true;
-        select.appendChild(option);
+    for (const key of ["theme", "theme_light"]) {
+      const select = document.getElementById("options_" + key);
+      if (select.childNodes.length === 0) {
+        for (const name of getThemeNames()) {
+          const option = document.createElement("option");
+          option.textContent = name;
+          if (name === get(key)) option.selected = true;
+          select.appendChild(option);
+        }
       }
     }
   });

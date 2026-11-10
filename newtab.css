@@ -630,6 +630,8 @@ input[type="file"]::-webkit-file-upload-button {
   margin-top: 0;
 }
 .finder-title {
+  flex-shrink: 0;
+  max-width: 65%;
   overflow: hidden;
   text-overflow: ellipsis;
 }

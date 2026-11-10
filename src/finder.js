@@ -125,6 +125,8 @@ async function openFinder() {
   }
 
   function onKeyDown(event) {
+    // Keys that commit or steer an IME composition belong to the IME
+    if (event.isComposing || event.keyCode === 229) return;
     let handled = true;
     if (isShortcut(event) || event.key === 'Escape') closeFinder();
     else if (event.key === 'ArrowDown') select(selected + 1);

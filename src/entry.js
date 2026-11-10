@@ -68,6 +68,9 @@ if (location.search.includes('options')) {
   config.showOptions(true);
 }
 
+// Options button opens the options panel
+document.getElementById('options_button').addEventListener('click', () => config.showOptions(true));
+
 // Event listeners for render requests
 on(Events.RENDER_REQUESTED, () => {
   if (window.renderColumns) window.renderColumns();

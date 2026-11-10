@@ -186,3 +186,41 @@ describe('crud write failures', () => {
     // Loop should have continued past the missing id
   });
 });
+
+describe('last cycle: tree.js / special-nodes.js boundaries', () => {
+  test('tree.js no longer imports layout.js', () => {
+    assert.ok(!/from '\.\/layout\.js'/.test(readSrc('bookmarks/tree.js')));
+  });
+  test('special-nodes.js no longer imports render.js or tree.js (it is a leaf)', () => {
+    const source = readSrc('bookmarks/special-nodes.js');
+    assert.ok(!/from '\.\.\/render\.js'/.test(source), 'must not import render.js');
+    assert.ok(!/from '\.\/tree\.js'/.test(source), 'must not import tree.js');
+  });
+
+  test('BOOKMARK_MISSING drops the stale grid entry', () => {
+    state.columns = [['f1', 'f2']];
+    state.coords = { f1: { x: 0, y: 0 }, f2: { x: 0, y: 1 } };
+    emit(Events.BOOKMARK_MISSING, 'f1');
+    const all = state.columns.flat();
+    assert.ok(!all.includes('f1'), 'f1 should be gone from the grid');
+    assert.ok(all.includes('f2'), 'f2 should remain');
+  });
+
+  test('CLOSED_REFRESH re-renders the recently-closed list in place', async () => {
+    const main = document.getElementById('main');
+    main.innerHTML = '';
+    const col = document.createElement('div');
+    const a = document.createElement('a');
+    a.className = 'closed';
+    const stale = document.createElement('div');
+    col.appendChild(a);
+    col.appendChild(stale);
+    main.appendChild(col);
+
+    emit(Events.CLOSED_REFRESH);
+    await new Promise((r) => setTimeout(r, 20));
+
+    assert.ok(!col.contains(stale), 'the stale child list should be removed');
+    assert.ok(col.querySelector('ul'), 'a fresh list should be rendered');
+  });
+});

@@ -241,6 +241,12 @@ export function syncLayoutAfterPaste(ids, parentId, below) {
 // (lock, newtab, show_root, number_* — see config/config.js).
 on(Events.COLUMNS_CHANGED, loadColumns);
 
+// A bookmark fetch failed, so the node no longer exists — drop its grid entry.
+// tree.js reports the miss; deciding what it means for the grid is layout's job.
+on(Events.BOOKMARK_MISSING, (id) => {
+  if (state.coords[id]) removeRow(state.coords[id].x, state.coords[id].y);
+});
+
 // Show/hide a special node or top-level bookmark folder from the grid.
 // Mirrors the legacy setConfig "show_*" handling: hiding removes the row,
 // showing lets verifyColumns restore it (respecting its show_<id> config).

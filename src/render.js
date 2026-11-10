@@ -2,7 +2,7 @@ import { get, scale } from './config/config.js';
 import * as chromeApi from './chrome-api.js';
 import { state } from './state.js';
 import { getChildrenFunction, getSubTree } from './bookmarks/tree.js';
-import { emit, Events } from './events.js';
+import { on, emit, Events } from './events.js';
 
 
 // ----- NODE -----
@@ -137,6 +137,34 @@ export function renderAll(nodes, target, toplevel) {
   emit(Events.RENDER_COMPLETE);
   return ul;
 }
+
+// ----- RECENTLY CLOSED REFRESH -----
+// Re-render the recently-closed children in place after a session restore.
+// This used to live in bookmarks/special-nodes.js, which forced that module to
+// import render.js and tree.js — the last import cycle. It is DOM work, so it
+// belongs here; special-nodes.js just emits CLOSED_REFRESH.
+function refreshClosedList() {
+  const targets = [];
+  const folders = document.getElementsByClassName('closed');
+  for (let i = 0; i < folders.length; i++) {
+    const a = folders[i];
+    if (a.nextSibling) {
+      a.parentNode.removeChild(a.nextSibling);
+      targets.push(a.parentNode);
+    }
+  }
+  if (folders.length === 0 && state.coords && state.coords['closed']) {
+    const target = document.getElementsByClassName('column')[state.coords['closed'].x];
+    target.removeChild(target.firstChild);
+    targets.push(target);
+  }
+
+  getChildrenFunction({ id: 'closed' })((result) => {
+    for (let i = 0; i < targets.length; i++) renderAll(result, targets[i]);
+  });
+}
+
+on(Events.CLOSED_REFRESH, refreshClosedList);
 
 // ----- ICONS -----
 // Gets best icon for a node

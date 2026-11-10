@@ -54,6 +54,10 @@ export const Events = {
   BOOKMARK_UPDATED: 'bookmark:updated',
   BOOKMARK_DELETED: 'bookmark:deleted',
   BOOKMARK_MOVED: 'bookmark:moved',
+  BOOKMARK_MISSING: 'bookmark:missing',
+
+  // Special nodes
+  CLOSED_REFRESH: 'closed:refresh',
 
   // Config
   CONFIG_CHANGED: 'config:changed',

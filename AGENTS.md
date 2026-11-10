@@ -38,8 +38,8 @@ There is **no dependency injection**. Modules import each other directly; `confi
 
 1. **Build**: `npm run build` (esbuild bundles `src/entry.js` → `output.js`, iife, chrome104). Use `npm run dev` for watch mode.
 2. **Edit** files under `src/`. **Always rebuild before testing** — `newtab.html` runs `output.js`, not `src/`.
-3. **Test**: load the **project root** as an unpacked extension in Chrome (`chrome://extensions` → Load unpacked).
-4. `npm test` is a no-op echo — there is no automated suite yet.
+3. **Test**: `npm test` runs the Node test runner over `test/**/*.test.mjs` (jsdom is a devDependency). `npm run test:watch` for watch mode. The suite is smoke-level: render wiring, the crud → event → vim wiring, and the theme_mode logic.
+4. **Manual test**: load the **project root** as an unpacked extension in Chrome (`chrome://extensions` → Load unpacked) for anything the jsdom tests cannot reach — drag-drop feel, animations, real Chrome APIs.
 
 ## Key Patterns
 
@@ -96,7 +96,8 @@ There is **no dependency injection**. Modules import each other directly; `confi
 - **`layout.js` runs `mutations.setSpecial(SPECIAL)` at module scope**, and `SPECIAL` comes from `special-nodes.js`. Under native ESM the real boot order (`entry.js` → `bookmarks/index.js`, whose barrel evaluates `special-nodes.js` first) throws `Cannot access 'SPECIAL' before initialization`. The esbuild bundle reorders modules and does not hit it, so the shipped extension is unaffected — but anything importing `src/` directly must enter the graph via `render.js` first. Breaking the cycle above fixes this properly.
 - **`vim.js` has an import-time side effect**: it creates a `MutationObserver` on `#main` and calls `vimInit()` at module scope. Importing `vim.js` is not free.
 - **DOM expandos still carry state**: `anchor._vimNode` (full bookmark node) and `anchor.open` (folder expanded flag) are set in `render.js` and read in `bookmarks/crud.js`, `bookmarks/layout.js`, `interaction.js`. Module-private `dragIds`/`dropTarget` (`interaction.js`) and `tooltipTimeout` (`render.js`) also remain outside `state.js`.
-- `events.js` swallows handler errors (logs via `console.error`) — an exception in one listener won't break others.
+- **Tests must install jsdom globals before importing `src/`**: the modules read `document`/`window`/`localStorage` at import time, and `vim.js` starts an observer as a module side effect. `test/helpers/dom.mjs` does this — import it first, or you get failures that look like bugs in the code under test.
+- **`events.js` swallows handler errors (logs via `console.error`)** — an exception in one listener won't break others.
 - Chrome's "Other Bookmarks" has id=2 with a dynamic `show_2` config key that is not in `DEFAULTS` — `isNodeShown` (`bookmarks/layout.js`) falls back to localStorage.
 
 ## Testing Checklist (Manual)

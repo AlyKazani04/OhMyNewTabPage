@@ -222,6 +222,13 @@ function findAnchor(scope, id, end) {
 }
 
 // Open the entry's ancestor folders in its column and put the vim cursor on it
+// Vim cursor and browser focus on the same anchor, so the next Tab or Enter starts from it
+function placeCursor(x, y) {
+  mutations.setVimCursor(x, y);
+  updateCursorVisuals();
+  if (state.vimEl) state.vimEl.focus({ preventScroll: true });
+}
+
 async function revealEntry(entry, openFolder) {
   if (close) close();
   const end = performance.now() + 2000;
@@ -233,8 +240,7 @@ async function revealEntry(entry, openFolder) {
   }
   const col = document.getElementsByClassName('column')[pick.x];
   if (pick.start === chain.length) {
-    mutations.setVimCursor(pick.x, 0);
-    updateCursorVisuals();
+    placeCursor(pick.x, 0);
     return;
   }
   // Each step searches only under the previous anchor, so a stale copy elsewhere
@@ -261,16 +267,14 @@ async function revealEntry(entry, openFolder) {
     showNotice("Couldn't reveal it — reload the page");
     return;
   }
-  mutations.setVimCursor(pick.x, index);
-  updateCursorVisuals();
+  placeCursor(pick.x, index);
   if (openFolder && entry.isFolder && !target.open) {
     toggle(target._vimNode, target);
     // Opening it can collapse a sibling above it; place the cursor again once that ends
     await poll(() => (col.querySelector('.wrap.closing') ? null : true), performance.now() + 1500);
     const i = getVisibleLinks(pick.x).indexOf(target);
     if (i >= 0 && state.vimEl === target) {
-      mutations.setVimCursor(pick.x, i);
-      updateCursorVisuals();
+      placeCursor(pick.x, i);
     }
   }
 }

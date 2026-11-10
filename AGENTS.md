@@ -40,7 +40,7 @@ There is **no dependency injection**. Modules import each other directly; `confi
 
 1. **Build**: `npm run build` (esbuild bundles `src/entry.js` → `output.js`, iife, chrome104). Use `npm run dev` for watch mode.
 2. **Edit** files under `src/`. **Always rebuild before testing** — `newtab.html` runs `output.js`, not `src/`.
-3. **Test**: `npm test` runs the Node test runner over `test/**/*.test.mjs` (jsdom is a devDependency). `npm run test:watch` for watch mode. The suite is smoke-level: render wiring, the crud → event → vim wiring, and the theme_mode logic.
+3. **Test**: `npm test` runs the Node test runner over `test/**/*.test.mjs` (jsdom is a devDependency). `npm run test:watch` for watch mode. The suite is smoke-level: render wiring, the crud → event → vim wiring, the theme_mode logic, and the finder's matching and ranking.
 4. **Manual test**: load the **project root** as an unpacked extension in Chrome (`chrome://extensions` → Load unpacked) for anything the jsdom tests cannot reach — drag-drop feel, animations, real Chrome APIs.
 
 ## Key Patterns

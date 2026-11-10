@@ -220,7 +220,10 @@ async function revealEntry(entry, openFolder) {
     scope = a.parentNode;
   }
   const target = scope && await findAnchor(scope, entry.node.id, end);
+  // auto_close may be collapsing a sibling folder: its rows stay in the DOM (and in
+  // getVisibleLinks) until the slide animation ends, which would skew the index
   const index = target && await poll(() => {
+    if (col.querySelector('.wrap.closing')) return null;
     const i = getVisibleLinks(pick.x).indexOf(target);
     return i < 0 ? null : i;
   }, end);
@@ -230,5 +233,14 @@ async function revealEntry(entry, openFolder) {
   }
   mutations.setVimCursor(pick.x, index);
   updateCursorVisuals();
-  if (openFolder && entry.isFolder && !target.open) toggle(target._vimNode, target);
+  if (openFolder && entry.isFolder && !target.open) {
+    toggle(target._vimNode, target);
+    // Opening it can collapse a sibling above it; place the cursor again once that ends
+    await poll(() => (col.querySelector('.wrap.closing') ? null : true), performance.now() + 1500);
+    const i = getVisibleLinks(pick.x).indexOf(target);
+    if (i >= 0 && state.vimEl === target) {
+      mutations.setVimCursor(pick.x, i);
+      updateCursorVisuals();
+    }
+  }
 }

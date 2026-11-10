@@ -22,6 +22,7 @@ import { folderMoveDrop } from './bookmarks/crud.js';
 import * as chromeApi from './chrome-api.js';
 import { openLink, toggle } from './render.js';
 import { showOptions } from './config/ui.js';
+import { on, Events } from './events.js';
 
 
 // Keyboard handler
@@ -514,3 +515,34 @@ export function clearDropTarget() {
   }
   dropTarget = null;
 }
+
+// ----- RENDER WIRING -----
+// The render layer emits RENDER_COMPLETE once it has produced DOM. Attaching
+// behavior here (instead of inside render.js) keeps the dependency one-way:
+// interaction.js -> render.js, never the reverse.
+export function attachRenderHandlers() {
+  // Columns: context menu + drag source
+  const columns = document.getElementsByClassName('column');
+  for (let i = 0; i < columns.length; i++) {
+    addColumnHandlers(i, columns[i]);
+    enableDragColumn(i, columns[i]);
+  }
+
+  // Anchors: folder click/context menu + drag source
+  const anchors = document.querySelectorAll('#main a');
+  for (let i = 0; i < anchors.length; i++) {
+    const anchor = anchors[i];
+    const node = anchor._vimNode;
+    if (!node) continue;
+    if (node.children) {
+      addFolderHandlers(node, anchor);
+      enableDragFolder(node, anchor);
+    } else if (node.id === 'apps') {
+      enableDragFolder(node, anchor);
+    }
+  }
+
+  enableDragDrop();
+}
+
+on(Events.RENDER_COMPLETE, attachRenderHandlers);

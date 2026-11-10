@@ -3,13 +3,6 @@ import * as chromeApi from './chrome-api.js';
 import { state } from './state.js';
 import { getChildrenFunction, getSubTree } from './bookmarks/tree.js';
 import { emit, Events } from './events.js';
-import {
-  enableDragColumn,
-  enableDragFolder,
-  enableDragDrop,
-  addColumnHandlers,
-  addFolderHandlers
-} from './interaction.js';
 
 
 // ----- NODE -----
@@ -113,12 +106,6 @@ export function render(node, target) {
         renderAll(result, li);
       });
     }
-
-    // Click handlers
-    addFolderHandlers(node, a);
-    enableDragFolder(node, a);
-  } else if (node.id === 'apps') {
-    enableDragFolder(node, a);
   }
 
   target.appendChild(li);
@@ -144,6 +131,10 @@ export function renderAll(nodes, target, toplevel) {
     target.appendChild(wrap);
   }
   updateTooltips();
+  // New DOM has been added. Emitted here (not just by renderColumns) because
+  // renderAll also runs from un-awaited callbacks: pre-expanded folders on first
+  // render, folder toggles, and the recently-closed refresh.
+  emit(Events.RENDER_COMPLETE);
   return ul;
 }
 
@@ -247,6 +238,8 @@ export function toggle(node, anchor) {
       if (!anchor.nextSibling && anchor.open) {
         renderAll(result, anchor.parentNode);
         animate(node, anchor, isOpen);
+        // New nodes need behavior attached; render.js must not import interaction.js.
+        emit(Events.RENDER_COMPLETE);
       }
     });
   }
@@ -291,61 +284,59 @@ export function animate(node, anchor, isOpen) {
 }
 
 // ----- COLUMN -----
+// Promisify the callback-style tree readers so a column render can be awaited.
+function getSubTreeAsync(id) {
+  return new Promise((resolve) => getSubTree(id, resolve));
+}
+
+function getChildrenAsync(node) {
+  return new Promise((resolve) => getChildrenFunction(node)(resolve));
+}
+
 // Render column with given index
-export function renderColumn(index, target) {
+export async function renderColumn(index, target) {
   const ids = state.columns[index];
   if (!ids) return;
 
   if (ids.length === 1 && !get('show_root')) {
-    getChildrenFunction({ id: ids[0] })((result) => {
-      if (!state.columns[index]) return;
-      renderAll(result, target);
-      addColumnHandlers(index, target);
-    });
+    const result = await getChildrenAsync({ id: ids[0] });
+    if (!state.columns[index]) return;
+    renderAll(result, target);
   } else if (ids.length > 0) {
-    let i = 0;
     const nodes = [];
     // Get all nodes for column
-    const callback = (result) => {
+    for (let i = 0; i < ids.length; i++) {
+      const result = await getSubTreeAsync(ids[i]);
       if (!state.columns[index]) return;
-
       for (let j = 0; j < result.length; j++) nodes.push(result[j]);
-      i++;
-      if (i < ids.length) {
-        getSubTree(ids[i], callback);
-      } else {
-        // Render node list
-        renderAll(nodes, target, true);
-        addColumnHandlers(index, target);
-      }
-    };
-    getSubTree(ids[i], callback);
+    }
+    // Render node list
+    renderAll(nodes, target, true);
   }
 }
 
 // ----- RENDERER -----
 // Render all columns to main div
-export function renderColumns() {
+export async function renderColumns() {
   // Clear main div
   const target = document.getElementById('main');
   while (target.hasChildNodes()) target.removeChild(target.lastChild);
 
-  // Render columns
+  // Render columns (content is fetched asynchronously, as before)
+  const renders = [];
   for (let i = 0; i < state.columns.length; i++) {
     const column = document.createElement('div');
     column.className = 'column';
 
     column.style.width = (1 / state.columns.length) * 100 + '%';
 
-    // Enable drag and drop
-    enableDragColumn(i, column);
-
     target.appendChild(column);
-    renderColumn(i, column);
+    renders.push(renderColumn(i, column));
   }
 
-  enableDragDrop();
+  await Promise.all(renders);
 
-  // Signal render complete
+  // Signal render complete — only once every column's content has been fetched,
+  // so behaviour attached by listeners sees the full DOM.
   emit(Events.RENDER_COMPLETE);
 }

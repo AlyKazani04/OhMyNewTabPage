@@ -15,14 +15,13 @@ setupChrome({ '1': { id: '1', title: 'Bookmarks Bar', children: [] } });
 
 const { state, mutations } = await import(src('state.js'));
 const { emit, on, Events } = await import(src('events.js'));
-// Imported before vim.js on purpose: the source tree still has the
-// special-nodes <-> render cycle, and layout.js runs
-// `mutations.setSpecial(SPECIAL)` at module scope. Entering the graph via
-// render.js evaluates special-nodes.js first, so SPECIAL is initialized in
-// time. Entering via bookmarks/index.js — the real boot order — does not,
-// and native ESM throws "Cannot access 'SPECIAL' before initialization".
+// Imported before vim.js on purpose: this is the order the real boot uses
+// (entry.js -> bookmarks/index.js -> ... -> render.js -> vim.js).
 await import(src('render.js'));
 const vim = await import(src('vim.js'));
+// vim.js no longer self-initializes at import time; wire it explicitly, exactly
+// as entry.js does.
+vim.vimInit();
 const crud = await import(src('bookmarks/crud.js'));
 const overlay = await import(src('overlay.js'));
 

@@ -53,13 +53,14 @@ There is **no dependency injection**. Modules import each other directly; `confi
 
 ## Boot Sequence (`src/entry.js`)
 
-1. Module imports run first (module side effects — including `vim.js`'s observer, see Gotchas).
+1. Module imports run first. `vim.js` no longer self-initializes here — all wiring is explicit (see Gotchas).
 2. `config.loadAll()` — loads config, runs the theme migration, applies CSS vars.
 3. `interaction.initKeyboard()` — attaches the global keydown handler.
-4. `?options` handling — opens the panel if the URL requests it.
-5. `#options_button` click → `config.showOptions(true)`.
-6. `on(RENDER_REQUESTED, …)` → `render.renderColumns()`.
-7. `bookmarks.loadColumns()` — fetches the bookmarks root, builds the grid, emits `RENDER_REQUESTED`.
+4. `vimInit()` — registers the vim event wiring and observes `#main` so the cursor follows re-renders.
+5. `?options` handling — opens the panel if the URL requests it.
+6. `#options_button` click → `config.showOptions(true)`.
+7. `on(RENDER_REQUESTED, …)` → `render.renderColumns()`.
+8. `bookmarks.loadColumns()` — fetches the bookmarks root, builds the grid, emits `RENDER_REQUESTED`.
 
 `loadColumns()` runs last; without it nothing renders.
 
@@ -94,9 +95,9 @@ There is **no dependency injection**. Modules import each other directly; `confi
 - `localStorage` keys prefixed with `options.` and `column.X.Y`.
 - **No circular imports remain.** The last one (`render.js` → `bookmarks/tree.js` → `bookmarks/layout.js` → `bookmarks/special-nodes.js` → `render.js`) is broken. `tree.js` now reports a missing bookmark via `BOOKMARK_MISSING` instead of calling `removeRow` in `layout.js`, and `special-nodes.js` is a leaf: restoring a session emits `CLOSED_REFRESH`, and `render.js` (which already owns the DOM) re-renders the list. Do not add new ones.
 - **`layout.js` runs `mutations.setSpecial(SPECIAL)` at module scope**, and `SPECIAL` comes from `special-nodes.js`. While the cycle existed, the real boot order (`entry.js` → `bookmarks/index.js`, whose barrel evaluates `special-nodes.js` first) threw `Cannot access 'SPECIAL' before initialization` under native ESM; the esbuild bundle reorders modules and never hit it. The cycle is gone, so the order is safe — `test/boot-order.test.mjs` pins it.
-- **`vim.js` has an import-time side effect**: it creates a `MutationObserver` on `#main` and calls `vimInit()` at module scope. Importing `vim.js` is not free.
+- **`vim.js` is initialized explicitly.** It used to self-initialize at import time (event registrations, a `MutationObserver`, and an auto-init block keyed off `document.readyState`). `entry.js` now calls `vimInit()`, which is idempotent, so importing `vim.js` has no side effects. Note that `render.js` and `layout.js` still register their own listeners at import time — milder (no DOM access), but the same pattern.
 - **DOM expandos still carry state**: `anchor._vimNode` (full bookmark node) and `anchor.open` (folder expanded flag) are set in `render.js` and read in `bookmarks/crud.js`, `bookmarks/layout.js`, `interaction.js`. These are the last shared values living outside `state.js` — `anchor._vimNode` is deliberately deferred to the rendering PR (the flat accordion changes the DOM → node mapping); `anchor.open` → `state.expandedFolders` is the remaining Phase 1 item.
-- **Tests must install jsdom globals before importing `src/`**: the modules read `document`/`window`/`localStorage` at import time, and `vim.js` starts an observer as a module side effect. `test/helpers/dom.mjs` does this — import it first, or you get failures that look like bugs in the code under test.
+- **Tests must install jsdom globals before importing `src/`**: several modules read `document`/`window`/`localStorage` at import time. `test/helpers/dom.mjs` does this — import it first, or you get failures that look like bugs in the code under test.
 - **`events.js` swallows handler errors (logs via `console.error`)** — an exception in one listener won't break others.
 - Chrome's "Other Bookmarks" has id=2 with a dynamic `show_2` config key that is not in `DEFAULTS` — `isNodeShown` (`bookmarks/layout.js`) falls back to localStorage.
 

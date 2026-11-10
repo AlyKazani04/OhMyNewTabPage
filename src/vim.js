@@ -272,39 +272,42 @@ export function moveCursor(dx, dy) {
   updateCursorVisuals();
 }
 
-// ----- EVENT WIRING -----
-// The data layer reports writes; the cursor layer decides where to land.
-// crud.js emits instead of importing scheduleRestore, which is what removes
-// the crud.js -> vim.js edge of the import cycle.
-on(Events.BOOKMARK_CREATED, scheduleRestore);
-on(Events.BOOKMARK_UPDATED, scheduleRestore);
-
-// ----- OBSERVER -----
+// ----- INIT -----
+// This used to run as import side effects: the event registrations, the
+// MutationObserver construction, and an auto-init block that called vimInit()
+// on DOMContentLoaded (or immediately). Importing vim.js was therefore not free
+// and the boot order was implicit. entry.js now calls vimInit() explicitly, and
+// importing this module has no side effects at all.
+let vimObserver = null;
 let vimRafPending = false;
-const vimObserver = new MutationObserver(() => {
-  if (vimRafPending) return;
-  vimRafPending = true;
-  requestAnimationFrame(() => {
-    vimRafPending = false;
-    resolveCursor();
-  });
-});
+let vimWired = false;
 
 export function vimInit() {
+  if (vimWired) return;
+  vimWired = true;
+
+  // The data layer reports writes; the cursor layer decides where to land.
+  // crud.js emits instead of importing scheduleRestore, which is what removes
+  // the crud.js -> vim.js edge of the import cycle.
+  on(Events.BOOKMARK_CREATED, scheduleRestore);
+  on(Events.BOOKMARK_UPDATED, scheduleRestore);
+
+  if (!vimObserver) {
+    vimObserver = new MutationObserver(() => {
+      if (vimRafPending) return;
+      vimRafPending = true;
+      requestAnimationFrame(() => {
+        vimRafPending = false;
+        resolveCursor();
+      });
+    });
+  }
+
   const main = document.getElementById('main');
   if (main) {
     vimObserver.observe(main, { childList: true, subtree: true });
   }
   resolveCursor();
-}
-
-export { vimObserver };
-
-// Auto-initialize
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', vimInit);
-} else {
-  vimInit();
 }
 
 // ----- SELECTION -----
